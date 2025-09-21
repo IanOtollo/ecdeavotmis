@@ -11,6 +11,9 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import InstitutionBioData from "./pages/InstitutionBioData";
 import CaptureLearners from "./pages/CaptureLearners";
+import EmergencyReporting from "./pages/EmergencyReporting";
+import TransferLearners from "./pages/TransferLearners";
+import Infrastructure from "./pages/Infrastructure";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -55,7 +58,10 @@ const App = () => {
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/institution/bio-data" element={<InstitutionBioData />} />
+                    <Route path="/institution/infrastructure" element={<Infrastructure />} />
+                    <Route path="/institution/emergency" element={<EmergencyReporting />} />
                     <Route path="/learners/capture" element={<CaptureLearners />} />
+                    <Route path="/learners/transfer" element={<TransferLearners />} />
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>
