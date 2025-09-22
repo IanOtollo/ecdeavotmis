@@ -14,6 +14,18 @@ import CaptureLearners from "./pages/CaptureLearners";
 import EmergencyReporting from "./pages/EmergencyReporting";
 import TransferLearners from "./pages/TransferLearners";
 import Infrastructure from "./pages/Infrastructure";
+import MyInstitution from "./pages/MyInstitution";
+import BankAccount from "./pages/BankAccount";
+import CapitationReceipts from "./pages/CapitationReceipts";
+import SchoolBooks from "./pages/SchoolBooks";
+import CaptureStudents from "./pages/CaptureStudents";
+import ViewLearners from "./pages/ViewLearners";
+import SearchLearners from "./pages/SearchLearners";
+import DeceasedLearner from "./pages/DeceasedLearner";
+import AdmissionReport from "./pages/AdmissionReport";
+import MyLearners from "./pages/MyLearners";
+import UPIReport from "./pages/UPIReport";
+import ChangePassword from "./pages/ChangePassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -60,8 +72,20 @@ const App = () => {
                     <Route path="/institution/bio-data" element={<InstitutionBioData />} />
                     <Route path="/institution/infrastructure" element={<Infrastructure />} />
                     <Route path="/institution/emergency" element={<EmergencyReporting />} />
+                    <Route path="/institution/profile" element={<MyInstitution />} />
+                    <Route path="/institution/bank" element={<BankAccount />} />
+                    <Route path="/institution/capitation" element={<CapitationReceipts />} />
+                    <Route path="/institution/books" element={<SchoolBooks />} />
                     <Route path="/learners/capture" element={<CaptureLearners />} />
+                    <Route path="/learners/capture-students" element={<CaptureStudents />} />
+                    <Route path="/learners/view" element={<ViewLearners />} />
+                    <Route path="/learners/search" element={<SearchLearners />} />
+                    <Route path="/learners/deceased" element={<DeceasedLearner />} />
                     <Route path="/learners/transfer" element={<TransferLearners />} />
+                    <Route path="/reports/admission" element={<AdmissionReport />} />
+                    <Route path="/reports/my-learners" element={<MyLearners />} />
+                    <Route path="/reports/upi" element={<UPIReport />} />
+                    <Route path="/utility/password" element={<ChangePassword />} />
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>

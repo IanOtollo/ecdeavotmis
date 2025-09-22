@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { UserPlus, Upload, Calendar, User, Save } from "lucide-react";
+import { UserPlus, Upload, GraduationCap, User, Save } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
-export default function CaptureLearners() {
+export default function CaptureStudents() {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     firstName: "",
@@ -16,14 +16,19 @@ export default function CaptureLearners() {
     otherName: "",
     gender: "",
     dateOfBirth: "",
+    nationalId: "",
     admissionDate: "",
     photo: null as File | null,
-    learnerType: "ecde", // ecde or vocational
+    course: "",
+    level: "",
+    duration: "",
+    previousEducation: "",
+    institution: "BTI" // Busia Technical Institute
   });
 
   // Generate UPI with Busia format: B-[Institution]-[Number]
   const generateUPI = () => {
-    const institutionCode = "T"; // T for Technical Institute
+    const institutionCode = formData.institution.charAt(0).toUpperCase(); // B for Busia, first letter of institution
     const randomNumber = Math.floor(Math.random() * 999) + 1;
     return `B${institutionCode}${randomNumber.toString().padStart(3, '0')}`;
   };
@@ -37,7 +42,7 @@ export default function CaptureLearners() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.firstName || !formData.lastName || !formData.gender || !formData.dateOfBirth) {
+    if (!formData.firstName || !formData.lastName || !formData.gender || !formData.dateOfBirth || !formData.course) {
       toast({
         title: "Missing Required Fields",
         description: "Please fill in all required fields marked with *",
@@ -47,7 +52,7 @@ export default function CaptureLearners() {
     }
 
     toast({
-      title: "Learner Registered Successfully",
+      title: "Student Registered Successfully",
       description: `${formData.firstName} ${formData.lastName} has been registered with UPI: ${generatedUPI}`,
     });
 
@@ -58,9 +63,14 @@ export default function CaptureLearners() {
       otherName: "",
       gender: "",
       dateOfBirth: "",
+      nationalId: "",
       admissionDate: "",
       photo: null,
-      learnerType: "ecde",
+      course: "",
+      level: "",
+      duration: "",
+      previousEducation: "",
+      institution: "BTI"
     });
   };
 
@@ -69,11 +79,11 @@ export default function CaptureLearners() {
       {/* Page Header */}
       <div>
         <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-          <UserPlus className="h-8 w-8 text-primary" />
-          Capture Learners
+          <GraduationCap className="h-8 w-8 text-primary" />
+          Capture Students
         </h1>
         <p className="text-muted-foreground">
-          Register new learners in ECDE (Early Childhood Development Education) or Vocational Training programs
+          Register new students in Vocational Training programs and Technical courses
         </p>
       </div>
 
@@ -81,32 +91,81 @@ export default function CaptureLearners() {
         {/* Registration Form */}
         <div className="lg:col-span-2">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Learner Type Selection */}
+            {/* Course Selection */}
             <Card>
               <CardHeader>
-                <CardTitle>Learner Type</CardTitle>
+                <CardTitle>Course Information</CardTitle>
                 <CardDescription>
-                  Select the type of program the learner will be enrolled in
+                  Select the course and program details for the student
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="flex gap-4">
-                  <Button
-                    type="button"
-                    variant={formData.learnerType === "ecde" ? "default" : "outline"}
-                    onClick={() => handleInputChange("learnerType", "ecde")}
-                    className="flex-1"
-                  >
-                    ECDE Learner
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={formData.learnerType === "vocational" ? "default" : "outline"}
-                    onClick={() => handleInputChange("learnerType", "vocational")}
-                    className="flex-1"
-                  >
-                    Vocational Student
-                  </Button>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="course">Course/Program *</Label>
+                    <Select onValueChange={(value) => handleInputChange("course", value)} required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select course" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="electrical">Electrical Technology</SelectItem>
+                        <SelectItem value="mechanical">Mechanical Engineering</SelectItem>
+                        <SelectItem value="ict">Information Communication Technology</SelectItem>
+                        <SelectItem value="automotive">Automotive Technology</SelectItem>
+                        <SelectItem value="building">Building Technology</SelectItem>
+                        <SelectItem value="fashion">Fashion Design & Textile</SelectItem>
+                        <SelectItem value="catering">Catering & Hotel Management</SelectItem>
+                        <SelectItem value="agriculture">Agriculture Technology</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="level">Level</Label>
+                    <Select onValueChange={(value) => handleInputChange("level", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="certificate">Certificate</SelectItem>
+                        <SelectItem value="diploma">Diploma</SelectItem>
+                        <SelectItem value="artisan">Artisan</SelectItem>
+                        <SelectItem value="craft">Craft</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="duration">Course Duration</Label>
+                    <Select onValueChange={(value) => handleInputChange("duration", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select duration" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="6months">6 Months</SelectItem>
+                        <SelectItem value="1year">1 Year</SelectItem>
+                        <SelectItem value="2years">2 Years</SelectItem>
+                        <SelectItem value="3years">3 Years</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="previousEducation">Previous Education</Label>
+                    <Select onValueChange={(value) => handleInputChange("previousEducation", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select education level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="primary">Primary Education</SelectItem>
+                        <SelectItem value="kcpe">KCPE Certificate</SelectItem>
+                        <SelectItem value="secondary">Secondary Education</SelectItem>
+                        <SelectItem value="kcse">KCSE Certificate</SelectItem>
+                        <SelectItem value="certificate">Post-Secondary Certificate</SelectItem>
+                        <SelectItem value="diploma">Diploma</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -119,7 +178,7 @@ export default function CaptureLearners() {
                   Personal Information
                 </CardTitle>
                 <CardDescription>
-                  Provide the learner's basic personal details
+                  Provide the student's basic personal details
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -181,6 +240,16 @@ export default function CaptureLearners() {
                   </div>
 
                   <div className="space-y-2">
+                    <Label htmlFor="nationalId">National ID/Birth Certificate</Label>
+                    <Input
+                      id="nationalId"
+                      placeholder="Enter ID or Birth Certificate number"
+                      value={formData.nationalId}
+                      onChange={(e) => handleInputChange("nationalId", e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="admissionDate">Admission Date</Label>
                     <Input
                       id="admissionDate"
@@ -201,12 +270,12 @@ export default function CaptureLearners() {
                   Photo Upload
                 </CardTitle>
                 <CardDescription>
-                  Upload a recent photograph of the learner
+                  Upload a recent photograph of the student
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  <Label htmlFor="photo">Learner Photo</Label>
+                  <Label htmlFor="photo">Student Photo</Label>
                   <Input
                     id="photo"
                     type="file"
@@ -225,7 +294,7 @@ export default function CaptureLearners() {
             <div className="flex justify-end">
               <Button type="submit" className="bg-gradient-primary hover:opacity-90">
                 <Save className="h-4 w-4 mr-2" />
-                Register {formData.learnerType === "ecde" ? "Learner" : "Student"}
+                Register Student
               </Button>
             </div>
           </form>
@@ -239,10 +308,10 @@ export default function CaptureLearners() {
                 <Badge variant="outline" className="text-primary">
                   UPI
                 </Badge>
-                Unique Personal Identifier
+                Student Identifier
               </CardTitle>
               <CardDescription>
-                Auto-generated unique identifier for the learner
+                Auto-generated unique identifier for the student
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -256,15 +325,15 @@ export default function CaptureLearners() {
               <div className="space-y-3 text-sm text-muted-foreground">
                 <div className="flex items-start gap-2">
                   <div className="h-2 w-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                  <p>Each learner receives a unique UPI upon registration</p>
+                  <p>B = Busia County identifier</p>
                 </div>
                 <div className="flex items-start gap-2">
                   <div className="h-2 w-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                  <p>UPI is used for tracking and reporting across the system</p>
+                  <p>Second letter = Institution code</p>
                 </div>
                 <div className="flex items-start gap-2">
                   <div className="h-2 w-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                  <p>This identifier remains with the learner throughout their educational journey</p>
+                  <p>Numbers = Sequential student number</p>
                 </div>
               </div>
             </CardContent>
@@ -272,15 +341,17 @@ export default function CaptureLearners() {
 
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle className="text-sm">Program Information</CardTitle>
+              <CardTitle className="text-sm">Registration Information</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Program Type:</span>
-                  <Badge variant={formData.learnerType === "ecde" ? "default" : "secondary"}>
-                    {formData.learnerType === "ecde" ? "ECDE" : "Vocational"}
-                  </Badge>
+                  <Badge variant="default">Vocational</Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Institution:</span>
+                  <span className="font-medium">Busia Technical Institute</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Registration Date:</span>
