@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import busiaLogo from "@/assets/busia-county-logo.png";
 
 interface HeaderProps {
   userName?: string;
@@ -21,13 +22,22 @@ export function Header({ userName = "Admin User", institutionName = "Sample Inst
       <div className="flex items-center gap-4">
         <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
         
-        <div className="flex items-center gap-2">
-          <Building2 className="h-5 w-5 text-primary" />
+        <a 
+          href="https://www.busiacounty.go.ke/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+        >
+          <img 
+            src={busiaLogo} 
+            alt="Busia County Logo" 
+            className="h-8 w-8 object-contain"
+          />
           <div>
             <h2 className="text-sm font-semibold text-foreground">{institutionName}</h2>
             <p className="text-xs text-muted-foreground">Educational Institution</p>
           </div>
-        </div>
+        </a>
       </div>
 
       <div className="flex items-center gap-4">
