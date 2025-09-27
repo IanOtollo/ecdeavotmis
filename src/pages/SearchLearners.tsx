@@ -23,60 +23,8 @@ export default function SearchLearners() {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Sample data for demonstration
-  const allLearners = [
-    {
-      id: 1,
-      upi: "BT001",
-      firstName: "John",
-      lastName: "Doe",
-      otherName: "Michael",
-      gender: "Male",
-      dateOfBirth: "2015-05-15",
-      type: "ecde",
-      course: "Early Childhood Development",
-      level: "Pre-Unit",
-      admissionDate: "2024-01-15",
-      status: "Active",
-      photo: null,
-      guardianName: "Mary Doe",
-      guardianPhone: "+254700000001"
-    },
-    {
-      id: 2,
-      upi: "BT002",
-      firstName: "Jane",
-      lastName: "Smith",
-      otherName: "",
-      gender: "Female",
-      dateOfBirth: "2002-08-22",
-      type: "vocational",
-      course: "Electrical Technology",
-      level: "Certificate",
-      admissionDate: "2024-02-01",
-      status: "Active",
-      photo: null,
-      guardianName: "Robert Smith",
-      guardianPhone: "+254700000002"
-    },
-    {
-      id: 3,
-      upi: "BT003",
-      firstName: "Peter",
-      lastName: "Johnson",
-      otherName: "Paul",
-      gender: "Male",
-      dateOfBirth: "2016-03-10",
-      type: "ecde",
-      course: "Early Childhood Development",
-      level: "Baby Class",
-      admissionDate: "2024-01-20",
-      status: "Active",
-      photo: null,
-      guardianName: "Susan Johnson",
-      guardianPhone: "+254700000003"
-    }
-  ];
+  // Data will be loaded from Supabase
+  const allLearners = [];
 
   const handleFilterChange = (field: string, value: string) => {
     setSearchFilters(prev => ({ ...prev, [field]: value }));

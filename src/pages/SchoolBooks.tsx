@@ -27,53 +27,7 @@ export default function SchoolBooks() {
     condition: "new"
   });
 
-  const [books] = useState([
-    {
-      id: 1,
-      title: "Mathematics for Early Learners",
-      author: "Dr. Jane Smith",
-      isbn: "978-9966-123-45-6",
-      category: "Textbook",
-      level: "ECDE",
-      subject: "Mathematics",
-      publisher: "Kenya Literature Bureau",
-      yearPublished: "2023",
-      quantity: 50,
-      unitPrice: "KSH 450",
-      condition: "New",
-      status: "Available"
-    },
-    {
-      id: 2,
-      title: "Fundamentals of Electronics",
-      author: "Prof. Michael Johnson",
-      isbn: "978-9966-234-56-7",
-      category: "Technical Manual",
-      level: "Vocational",
-      subject: "Electronics",
-      publisher: "Technical Publishers Kenya",
-      yearPublished: "2022",
-      quantity: 25,
-      unitPrice: "KSH 850",
-      condition: "Good",
-      status: "Available"
-    },
-    {
-      id: 3,
-      title: "Child Development & Psychology",
-      author: "Sarah Wilson",
-      isbn: "978-9966-345-67-8",
-      category: "Reference",
-      level: "ECDE",
-      subject: "Child Development",
-      publisher: "Education Press",
-      yearPublished: "2023",
-      quantity: 15,
-      unitPrice: "KSH 650",
-      condition: "New",
-      status: "Available"
-    }
-  ]);
+  const [books] = useState([]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));

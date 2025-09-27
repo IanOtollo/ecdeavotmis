@@ -6,64 +6,39 @@ export default function Dashboard() {
   const stats = [
     {
       title: "Total Learners",
-      value: "1,234",
-      change: "+12.5%",
+      value: "0",
+      change: "0%",
       icon: Users,
       color: "text-primary",
       bgColor: "bg-primary-light",
     },
     {
       title: "Active Students",
-      value: "856",
-      change: "+8.3%", 
+      value: "0",
+      change: "0%", 
       icon: GraduationCap,
       color: "text-secondary",
       bgColor: "bg-secondary-light",
     },
     {
       title: "Institutions",
-      value: "47",
-      change: "+2.1%",
+      value: "0",
+      change: "0%",
       icon: Building2,
       color: "text-accent",
       bgColor: "bg-accent-light",
     },
     {
       title: "Reports Generated",
-      value: "289",
-      change: "+18.7%",
+      value: "0",
+      change: "0%",
       icon: FileText,
       color: "text-success",
       bgColor: "bg-success-light",
     },
   ];
 
-  const recentActivities = [
-    {
-      title: "New learner registration",
-      description: "John Doe has been registered in ECDE program",
-      time: "2 minutes ago",
-      type: "success",
-    },
-    {
-      title: "Institution bio-data updated",
-      description: "Sunflower Primary School updated their information",
-      time: "15 minutes ago", 
-      type: "info",
-    },
-    {
-      title: "Capitation receipt uploaded",
-      description: "Monthly capitation receipt submitted by Rainbow Academy",
-      time: "1 hour ago",
-      type: "success",
-    },
-    {
-      title: "UPI report generated",
-      description: "Student UPI report exported for Q3 2024",
-      time: "2 hours ago",
-      type: "info",
-    },
-  ];
+  const recentActivities = [];
 
   return (
     <div className="p-6 space-y-6">
@@ -114,7 +89,7 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {recentActivities.map((activity, index) => (
+            {recentActivities.length > 0 ? recentActivities.map((activity, index) => (
               <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-muted/50">
                 <div 
                   className={`h-2 w-2 rounded-full mt-2 ${
@@ -127,7 +102,11 @@ export default function Dashboard() {
                   <p className="text-xs text-muted-foreground mt-1">{activity.time}</p>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground">No recent activities to display</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

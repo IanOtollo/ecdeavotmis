@@ -13,68 +13,7 @@ export default function ViewLearners() {
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const [learners] = useState([
-    {
-      id: 1,
-      upi: "BT001",
-      firstName: "John",
-      lastName: "Doe",
-      otherName: "Michael",
-      gender: "Male",
-      dateOfBirth: "2015-05-15",
-      type: "ecde",
-      course: "Early Childhood Development",
-      level: "Pre-Unit",
-      admissionDate: "2024-01-15",
-      status: "Active",
-      photo: null
-    },
-    {
-      id: 2,
-      upi: "BT002",
-      firstName: "Jane",
-      lastName: "Smith",
-      otherName: "",
-      gender: "Female",
-      dateOfBirth: "2002-08-22",
-      type: "vocational",
-      course: "Electrical Technology",
-      level: "Certificate",
-      admissionDate: "2024-02-01",
-      status: "Active",
-      photo: null
-    },
-    {
-      id: 3,
-      upi: "BT003",
-      firstName: "Peter",
-      lastName: "Johnson",
-      otherName: "Paul",
-      gender: "Male",
-      dateOfBirth: "2016-03-10",
-      type: "ecde",
-      course: "Early Childhood Development", 
-      level: "Baby Class",
-      admissionDate: "2024-01-20",
-      status: "Active",
-      photo: null
-    },
-    {
-      id: 4,
-      upi: "BT004",
-      firstName: "Mary",
-      lastName: "Wilson",
-      otherName: "Grace",
-      gender: "Female",
-      dateOfBirth: "2003-11-05",
-      type: "vocational",
-      course: "Fashion Design & Textile",
-      level: "Diploma",
-      admissionDate: "2024-01-10",
-      status: "Graduated",
-      photo: null
-    }
-  ]);
+  const [learners] = useState([]);
 
   const filteredLearners = learners.filter(learner => {
     const matchesSearch = 
