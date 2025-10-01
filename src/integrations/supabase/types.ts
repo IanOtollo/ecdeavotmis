@@ -14,16 +14,517 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bank_accounts: {
+        Row: {
+          account_number: string | null
+          bank_name: string | null
+          branch: string | null
+          created_at: string | null
+          id: number
+          institution_id: number | null
+        }
+        Insert: {
+          account_number?: string | null
+          bank_name?: string | null
+          branch?: string | null
+          created_at?: string | null
+          id?: number
+          institution_id?: number | null
+        }
+        Update: {
+          account_number?: string | null
+          bank_name?: string | null
+          branch?: string | null
+          created_at?: string | null
+          id?: number
+          institution_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_accounts_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      capitation_receipts: {
+        Row: {
+          amount: number | null
+          created_at: string | null
+          date_received: string | null
+          file_path: string | null
+          id: number
+          institution_id: number | null
+          receipt_no: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string | null
+          date_received?: string | null
+          file_path?: string | null
+          id?: number
+          institution_id?: number | null
+          receipt_no?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string | null
+          date_received?: string | null
+          file_path?: string | null
+          id?: number
+          institution_id?: number | null
+          receipt_no?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "capitation_receipts_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      emergencies: {
+        Row: {
+          calamity_name: string | null
+          created_at: string | null
+          description: string | null
+          id: number
+          institution_id: number | null
+          reporting_date: string | null
+          response: string | null
+          status: string | null
+        }
+        Insert: {
+          calamity_name?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: number
+          institution_id?: number | null
+          reporting_date?: string | null
+          response?: string | null
+          status?: string | null
+        }
+        Update: {
+          calamity_name?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: number
+          institution_id?: number | null
+          reporting_date?: string | null
+          response?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emergencies_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      infrastructure: {
+        Row: {
+          asset_name: string | null
+          asset_type: string | null
+          classification: string | null
+          cost: number | null
+          created_at: string | null
+          id: number
+          institution_id: number | null
+          quantity: number | null
+          year_of_acquisition: number | null
+        }
+        Insert: {
+          asset_name?: string | null
+          asset_type?: string | null
+          classification?: string | null
+          cost?: number | null
+          created_at?: string | null
+          id?: number
+          institution_id?: number | null
+          quantity?: number | null
+          year_of_acquisition?: number | null
+        }
+        Update: {
+          asset_name?: string | null
+          asset_type?: string | null
+          classification?: string | null
+          cost?: number | null
+          created_at?: string | null
+          id?: number
+          institution_id?: number | null
+          quantity?: number | null
+          year_of_acquisition?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "infrastructure_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      institutions: {
+        Row: {
+          category: string | null
+          county: string | null
+          created_at: string | null
+          education_system: string | null
+          geo_lat: string | null
+          geo_lng: string | null
+          id: number
+          kra_pin: string | null
+          level: string | null
+          location: string | null
+          name: string
+          nearest_health: string | null
+          nearest_police: string | null
+          nearest_town: string | null
+          ownership: string | null
+          ownership_doc: string | null
+          registration_date: string | null
+          registration_no: string | null
+          sbp_compliance: boolean | null
+          subcounty: string | null
+          type: string | null
+          unique_code: string | null
+          ward: string | null
+          zone: string | null
+        }
+        Insert: {
+          category?: string | null
+          county?: string | null
+          created_at?: string | null
+          education_system?: string | null
+          geo_lat?: string | null
+          geo_lng?: string | null
+          id?: number
+          kra_pin?: string | null
+          level?: string | null
+          location?: string | null
+          name: string
+          nearest_health?: string | null
+          nearest_police?: string | null
+          nearest_town?: string | null
+          ownership?: string | null
+          ownership_doc?: string | null
+          registration_date?: string | null
+          registration_no?: string | null
+          sbp_compliance?: boolean | null
+          subcounty?: string | null
+          type?: string | null
+          unique_code?: string | null
+          ward?: string | null
+          zone?: string | null
+        }
+        Update: {
+          category?: string | null
+          county?: string | null
+          created_at?: string | null
+          education_system?: string | null
+          geo_lat?: string | null
+          geo_lng?: string | null
+          id?: number
+          kra_pin?: string | null
+          level?: string | null
+          location?: string | null
+          name?: string
+          nearest_health?: string | null
+          nearest_police?: string | null
+          nearest_town?: string | null
+          ownership?: string | null
+          ownership_doc?: string | null
+          registration_date?: string | null
+          registration_no?: string | null
+          sbp_compliance?: boolean | null
+          subcounty?: string | null
+          type?: string | null
+          unique_code?: string | null
+          ward?: string | null
+          zone?: string | null
+        }
+        Relationships: []
+      }
+      learners: {
+        Row: {
+          admission_date: string | null
+          created_at: string | null
+          dob: string | null
+          first_name: string | null
+          gender: string | null
+          id: number
+          institution_id: number | null
+          last_name: string | null
+          other_name: string | null
+          photo: string | null
+          status: string | null
+          upi: string
+        }
+        Insert: {
+          admission_date?: string | null
+          created_at?: string | null
+          dob?: string | null
+          first_name?: string | null
+          gender?: string | null
+          id?: number
+          institution_id?: number | null
+          last_name?: string | null
+          other_name?: string | null
+          photo?: string | null
+          status?: string | null
+          upi: string
+        }
+        Update: {
+          admission_date?: string | null
+          created_at?: string | null
+          dob?: string | null
+          first_name?: string | null
+          gender?: string | null
+          id?: number
+          institution_id?: number | null
+          last_name?: string | null
+          other_name?: string | null
+          photo?: string | null
+          status?: string | null
+          upi?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learners_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          full_name: string | null
+          id: string
+          institution_id: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          full_name?: string | null
+          id: string
+          institution_id?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          full_name?: string | null
+          id?: string
+          institution_id?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      students: {
+        Row: {
+          admission_date: string | null
+          created_at: string | null
+          dob: string | null
+          first_name: string | null
+          gender: string | null
+          id: number
+          institution_id: number | null
+          last_name: string | null
+          other_name: string | null
+          photo: string | null
+          status: string | null
+          upi: string
+        }
+        Insert: {
+          admission_date?: string | null
+          created_at?: string | null
+          dob?: string | null
+          first_name?: string | null
+          gender?: string | null
+          id?: number
+          institution_id?: number | null
+          last_name?: string | null
+          other_name?: string | null
+          photo?: string | null
+          status?: string | null
+          upi: string
+        }
+        Update: {
+          admission_date?: string | null
+          created_at?: string | null
+          dob?: string | null
+          first_name?: string | null
+          gender?: string | null
+          id?: number
+          institution_id?: number | null
+          last_name?: string | null
+          other_name?: string | null
+          photo?: string | null
+          status?: string | null
+          upi?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teachers: {
+        Row: {
+          created_at: string | null
+          dob: string | null
+          email: string | null
+          first_name: string | null
+          gender: string | null
+          id: number
+          institution_id: number | null
+          last_name: string | null
+          other_name: string | null
+          phone: string | null
+          photo: string | null
+          tsc_no: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          dob?: string | null
+          email?: string | null
+          first_name?: string | null
+          gender?: string | null
+          id?: number
+          institution_id?: number | null
+          last_name?: string | null
+          other_name?: string | null
+          phone?: string | null
+          photo?: string | null
+          tsc_no?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          dob?: string | null
+          email?: string | null
+          first_name?: string | null
+          gender?: string | null
+          id?: number
+          institution_id?: number | null
+          last_name?: string | null
+          other_name?: string | null
+          phone?: string | null
+          photo?: string | null
+          tsc_no?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teachers_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      users: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          full_name: string | null
+          id: number
+          institution_id: number | null
+          password_hash: string
+          role: string
+          username: string
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: number
+          institution_id?: number | null
+          password_hash: string
+          role: string
+          username: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: number
+          institution_id?: number | null
+          password_hash?: string
+          role?: string
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "users_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_institution: {
+        Args: { _user_id: string }
+        Returns: number
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "super_admin" | "institution_admin" | "teacher" | "data_clerk"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +651,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["super_admin", "institution_admin", "teacher", "data_clerk"],
+    },
   },
 } as const
