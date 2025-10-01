@@ -1,4 +1,4 @@
-import { Bell, User, Building2 } from "lucide-react";
+import { Bell, User, Building2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,13 +10,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import busiaLogo from "@/assets/busia-county-logo.png";
+import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
 
-interface HeaderProps {
-  userName?: string;
-  institutionName?: string;
-}
-
-export function Header({ userName = "Admin User", institutionName = "Sample Institution" }: HeaderProps) {
+export function Header() {
+  const { signOut } = useAuth();
+  const { profile, roles } = useProfile();
   return (
     <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 shadow-sm">
       <div className="flex items-center gap-4">
@@ -34,8 +33,8 @@ export function Header({ userName = "Admin User", institutionName = "Sample Inst
             className="h-8 w-8 object-contain"
           />
           <div>
-            <h2 className="text-sm font-semibold text-foreground">{institutionName}</h2>
-            <p className="text-xs text-muted-foreground">Educational Institution</p>
+            <h2 className="text-sm font-semibold text-foreground">SchoolBase Plus</h2>
+            <p className="text-xs text-muted-foreground">ECDEAVOTMIS</p>
           </div>
         </a>
       </div>
@@ -60,8 +59,8 @@ export function Header({ userName = "Admin User", institutionName = "Sample Inst
                 <User className="h-4 w-4 text-primary-foreground" />
               </div>
               <div className="text-left hidden sm:block">
-                <p className="text-sm font-medium text-foreground">{userName}</p>
-                <p className="text-xs text-muted-foreground">Administrator</p>
+                <p className="text-sm font-medium text-foreground">{profile?.full_name || 'User'}</p>
+                <p className="text-xs text-muted-foreground">{roles[0] || 'User'}</p>
               </div>
             </Button>
           </DropdownMenuTrigger>
@@ -75,8 +74,8 @@ export function Header({ userName = "Admin User", institutionName = "Sample Inst
               Institution Profile
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
-              <User className="mr-2 h-4 w-4" />
+            <DropdownMenuItem className="text-destructive" onClick={signOut}>
+              <LogOut className="mr-2 h-4 w-4" />
               Sign Out
             </DropdownMenuItem>
           </DropdownMenuContent>

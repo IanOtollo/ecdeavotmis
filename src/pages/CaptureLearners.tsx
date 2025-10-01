@@ -7,9 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function CaptureLearners() {
   const { toast } = useToast();
+  const { profile } = useProfile();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -34,7 +38,7 @@ export default function CaptureLearners() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.firstName || !formData.lastName || !formData.gender || !formData.dateOfBirth) {
@@ -46,22 +50,90 @@ export default function CaptureLearners() {
       return;
     }
 
-    toast({
-      title: "Learner Registered Successfully",
-      description: `${formData.firstName} ${formData.lastName} has been registered with UPI: ${generatedUPI}`,
-    });
+    if (!profile?.institution_id) {
+      toast({
+        title: "Error",
+        description: "You must be assigned to an institution to register learners",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    // Reset form
-    setFormData({
-      firstName: "",
-      lastName: "",
-      otherName: "",
-      gender: "",
-      dateOfBirth: "",
-      admissionDate: "",
-      photo: null,
-      learnerType: "ecde",
-    });
+    setIsSubmitting(true);
+
+    try {
+      let photoUrl = null;
+
+      // Upload photo if provided
+      if (formData.photo) {
+        const fileExt = formData.photo.name.split('.').pop();
+        const fileName = `${generatedUPI}.${fileExt}`;
+        const filePath = `${profile.institution_id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('learner-photos')
+          .upload(filePath, formData.photo);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('learner-photos')
+          .getPublicUrl(filePath);
+
+        photoUrl = publicUrl;
+      }
+
+      // Determine which table to insert into
+      const table = formData.learnerType === "ecde" ? "learners" : "students";
+
+      // Insert learner/student data
+      const { error: insertError } = await supabase
+        .from(table)
+        .insert({
+          upi: generatedUPI,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          other_name: formData.otherName || null,
+          gender: formData.gender,
+          dob: formData.dateOfBirth,
+          admission_date: formData.admissionDate || new Date().toISOString().split('T')[0],
+          photo: photoUrl,
+          institution_id: profile.institution_id,
+          status: 'enrolled'
+        });
+
+      if (insertError) throw insertError;
+
+      toast({
+        title: "Success!",
+        description: `${formData.firstName} ${formData.lastName} registered with UPI: ${generatedUPI}`,
+      });
+
+      // Reset form
+      setFormData({
+        firstName: "",
+        lastName: "",
+        otherName: "",
+        gender: "",
+        dateOfBirth: "",
+        admissionDate: "",
+        photo: null,
+        learnerType: "ecde",
+      });
+
+      // Reload to generate new UPI
+      window.location.reload();
+
+    } catch (error: any) {
+      console.error('Error registering learner:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to register learner",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -223,9 +295,13 @@ export default function CaptureLearners() {
 
             {/* Submit Button */}
             <div className="flex justify-end">
-              <Button type="submit" className="bg-gradient-primary hover:opacity-90">
+              <Button 
+                type="submit" 
+                className="bg-gradient-primary hover:opacity-90"
+                disabled={isSubmitting || !profile?.institution_id}
+              >
                 <Save className="h-4 w-4 mr-2" />
-                Register {formData.learnerType === "ecde" ? "Learner" : "Student"}
+                {isSubmitting ? 'Registering...' : `Register ${formData.learnerType === "ecde" ? "Learner" : "Student"}`}
               </Button>
             </div>
           </form>
