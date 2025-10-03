@@ -114,8 +114,8 @@ export default function Auth() {
             alt="Busia County" 
             className="h-20 mx-auto mb-4"
           />
-          <CardTitle className="text-2xl">SchoolBase Plus</CardTitle>
-          <CardDescription>Education Management Information System</CardDescription>
+          <CardTitle className="text-2xl">ECDEAVOTMIS</CardTitle>
+          <CardDescription>ECDE & Vocational Training Management Information System</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="w-full">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Database, Plus, Edit, Trash2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,10 +7,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function Infrastructure() {
   const { toast } = useToast();
+  const { profile } = useProfile();
   const [showAddForm, setShowAddForm] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     assetName: "",
     assetType: "",
@@ -21,64 +26,99 @@ export default function Infrastructure() {
     condition: "",
   });
 
-  // Mock infrastructure data
-  const [infrastructure, setInfrastructure] = useState([
-    {
-      id: 1,
-      assetName: "Classroom Block A",
-      assetType: "Building",
-      classification: "Permanent",
-      acquisitionYear: "2020",
-      quantity: "1",
-      estimatedCost: "2,500,000",
-      condition: "Good"
-    },
-    {
-      id: 2,
-      assetName: "Desks and Chairs",
-      assetType: "Furniture",
-      classification: "Movable",
-      acquisitionYear: "2022",
-      quantity: "50",
-      estimatedCost: "150,000",
-      condition: "Excellent"
-    },
-    {
-      id: 3,
-      assetName: "Computer Lab",
-      assetType: "Equipment",
-      classification: "Technology",
-      acquisitionYear: "2021",
-      quantity: "20",
-      estimatedCost: "800,000",
-      condition: "Good"
-    }
-  ]);
+  const [infrastructure, setInfrastructure] = useState<any[]>([]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const newAsset = {
-      id: infrastructure.length + 1,
-      ...formData
+  useEffect(() => {
+    if (!profile?.institution_id) return;
+
+    const fetchInfrastructure = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('infrastructure')
+          .select('*')
+          .eq('institution_id', profile.institution_id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setInfrastructure(data || []);
+      } catch (error: any) {
+        console.error('Error fetching infrastructure:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load infrastructure",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
     };
 
-    setInfrastructure([...infrastructure, newAsset]);
-    setShowAddForm(false);
-    setFormData({
-      assetName: "",
-      assetType: "",
-      classification: "",
-      acquisitionYear: "",
-      quantity: "",
-      estimatedCost: "",
-      condition: "",
-    });
+    fetchInfrastructure();
+  }, [profile?.institution_id, toast]);
 
-    toast({
-      title: "Infrastructure Added",
-      description: "New infrastructure asset has been successfully recorded.",
-    });
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!profile?.institution_id) {
+      toast({
+        title: "Error",
+        description: "Institution not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const { error } = await supabase
+        .from('infrastructure')
+        .insert({
+          institution_id: profile.institution_id,
+          asset_name: formData.assetName,
+          asset_type: formData.assetType,
+          classification: formData.classification,
+          year_of_acquisition: parseInt(formData.acquisitionYear),
+          quantity: parseInt(formData.quantity),
+          cost: formData.estimatedCost ? parseFloat(formData.estimatedCost) : null,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Infrastructure Added",
+        description: "New infrastructure asset has been successfully recorded.",
+      });
+
+      setShowAddForm(false);
+      setFormData({
+        assetName: "",
+        assetType: "",
+        classification: "",
+        acquisitionYear: "",
+        quantity: "",
+        estimatedCost: "",
+        condition: "",
+      });
+
+      // Refresh list
+      const { data } = await supabase
+        .from('infrastructure')
+        .select('*')
+        .eq('institution_id', profile.institution_id)
+        .order('created_at', { ascending: false });
+      
+      setInfrastructure(data || []);
+    } catch (error: any) {
+      console.error('Error adding infrastructure:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add infrastructure",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getConditionBadge = (condition: string) => {
@@ -226,8 +266,8 @@ export default function Infrastructure() {
                 <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-gradient-primary hover:opacity-90">
-                  Add Asset
+                <Button type="submit" className="bg-gradient-primary hover:opacity-90" disabled={isSubmitting}>
+                  {isSubmitting ? "Adding..." : "Add Asset"}
                 </Button>
               </div>
             </form>
@@ -244,54 +284,56 @@ export default function Infrastructure() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {infrastructure.map((asset) => (
-              <Card key={asset.id} className="card-hover">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <h4 className="font-semibold text-foreground">{asset.assetName}</h4>
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="ghost">
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="text-destructive">
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+          {loading ? (
+            <div className="text-center py-8">Loading...</div>
+          ) : infrastructure.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No infrastructure assets found. Add your first asset.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {infrastructure.map((asset) => (
+                <Card key={asset.id} className="card-hover">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <h4 className="font-semibold text-foreground">{asset.asset_name}</h4>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost">
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="text-destructive">
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Type:</span>
-                      <Badge variant="outline">{asset.assetType}</Badge>
+                    
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Type:</span>
+                        <Badge variant="outline">{asset.asset_type}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Classification:</span>
+                        <span className="font-medium">{asset.classification}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Year:</span>
+                        <span className="font-medium">{asset.year_of_acquisition}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Quantity:</span>
+                        <span className="font-medium">{asset.quantity}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Cost:</span>
+                        <span className="font-medium">KES {asset.cost ? Number(asset.cost).toLocaleString() : 'N/A'}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Classification:</span>
-                      <span className="font-medium">{asset.classification}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Year:</span>
-                      <span className="font-medium">{asset.acquisitionYear}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Quantity:</span>
-                      <span className="font-medium">{asset.quantity}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Cost:</span>
-                      <span className="font-medium">KES {Number(asset.estimatedCost).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Condition:</span>
-                      <Badge className={getConditionBadge(asset.condition)}>
-                        {asset.condition}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

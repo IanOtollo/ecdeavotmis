@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Upload, FileText, Calendar, DollarSign, Save, Download, Eye } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function CapitationReceipts() {
   const { toast } = useToast();
+  const { profile } = useProfile();
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     receiptNumber: "",
     amount: "",
@@ -21,36 +26,42 @@ export default function CapitationReceipts() {
     receiptFile: null as File | null
   });
 
-  const [receipts] = useState([
-    {
-      id: 1,
-      receiptNumber: "CAP/2024/001",
-      amount: "KSH 450,000",
-      receivedDate: "2024-01-15",
-      academicYear: "2024",
-      term: "Term 1",
-      description: "Q1 Capitation for 150 ECDE learners",
-      status: "Verified",
-      uploadDate: "2024-01-16"
-    },
-    {
-      id: 2,
-      receiptNumber: "CAP/2024/002",
-      amount: "KSH 300,000",
-      receivedDate: "2024-04-10",
-      academicYear: "2024",
-      term: "Term 2",
-      description: "Q2 Capitation for 100 Vocational students",
-      status: "Pending",
-      uploadDate: "2024-04-11"
-    }
-  ]);
+  const [receipts, setReceipts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!profile?.institution_id) return;
+
+    const fetchReceipts = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('capitation_receipts')
+          .select('*')
+          .eq('institution_id', profile.institution_id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setReceipts(data || []);
+      } catch (error: any) {
+        console.error('Error fetching receipts:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load receipts",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReceipts();
+  }, [profile?.institution_id, toast]);
 
   const handleInputChange = (field: string, value: string | File | null) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.receiptFile) {
       toast({
@@ -61,20 +72,74 @@ export default function CapitationReceipts() {
       return;
     }
 
-    toast({
-      title: "Receipt Uploaded Successfully",
-      description: `Capitation receipt ${formData.receiptNumber} has been uploaded for verification.`,
-    });
+    if (!profile?.institution_id) {
+      toast({
+        title: "Error",
+        description: "Institution not found",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    setFormData({
-      receiptNumber: "",
-      amount: "",
-      receivedDate: "",
-      academicYear: "",
-      term: "",
-      description: "",
-      receiptFile: null
-    });
+    try {
+      setIsSubmitting(true);
+
+      // Upload file to storage
+      const fileExt = formData.receiptFile.name.split('.').pop();
+      const fileName = `${profile.institution_id}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('receipts')
+        .upload(fileName, formData.receiptFile);
+
+      if (uploadError) throw uploadError;
+
+      // Save receipt record
+      const { error: insertError } = await supabase
+        .from('capitation_receipts')
+        .insert({
+          institution_id: profile.institution_id,
+          receipt_no: formData.receiptNumber,
+          amount: parseFloat(formData.amount),
+          date_received: formData.receivedDate,
+          file_path: fileName,
+        });
+
+      if (insertError) throw insertError;
+
+      toast({
+        title: "Receipt Uploaded Successfully",
+        description: `Capitation receipt ${formData.receiptNumber} has been uploaded for verification.`,
+      });
+
+      setFormData({
+        receiptNumber: "",
+        amount: "",
+        receivedDate: "",
+        academicYear: "",
+        term: "",
+        description: "",
+        receiptFile: null
+      });
+
+      // Refresh list
+      const { data } = await supabase
+        .from('capitation_receipts')
+        .select('*')
+        .eq('institution_id', profile.institution_id)
+        .order('created_at', { ascending: false });
+      
+      setReceipts(data || []);
+    } catch (error: any) {
+      console.error('Error uploading receipt:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload receipt",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -188,9 +253,9 @@ export default function CapitationReceipts() {
             </div>
 
             <div className="flex justify-end">
-              <Button type="submit">
+              <Button type="submit" disabled={isSubmitting}>
                 <Save className="h-4 w-4 mr-2" />
-                Upload Receipt
+                {isSubmitting ? "Uploading..." : "Upload Receipt"}
               </Button>
             </div>
           </form>
@@ -204,61 +269,59 @@ export default function CapitationReceipts() {
           <CardDescription>All capitation receipts uploaded for your institution</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Receipt Details</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Academic Period</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {receipts.map((receipt) => (
-                <TableRow key={receipt.id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{receipt.receiptNumber}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Received: {new Date(receipt.receivedDate).toLocaleDateString()}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Uploaded: {new Date(receipt.uploadDate).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <DollarSign className="h-4 w-4 text-green-600" />
-                      <span className="font-medium">{receipt.amount}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{receipt.academicYear}</p>
-                      <Badge variant="outline">{receipt.term}</Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={receipt.status === "Verified" ? "default" : "secondary"}>
-                      {receipt.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          {loading ? (
+            <div className="text-center py-8">Loading...</div>
+          ) : receipts.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No receipts found. Upload your first capitation receipt.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Receipt Details</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {receipts.map((receipt) => (
+                  <TableRow key={receipt.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{receipt.receipt_no}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Uploaded: {new Date(receipt.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <DollarSign className="h-4 w-4 text-green-600" />
+                        <span className="font-medium">KES {receipt.amount?.toLocaleString()}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-sm">
+                        {receipt.date_received ? new Date(receipt.date_received).toLocaleDateString() : '-'}
+                      </p>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

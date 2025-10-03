@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Banknote, Building, CreditCard, Save, Plus, Edit, Trash2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,10 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function BankAccount() {
   const { toast } = useToast();
+  const { profile } = useProfile();
   const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     bankName: "",
     accountNumber: "",
@@ -23,52 +28,100 @@ export default function BankAccount() {
     purpose: "operational"
   });
 
-  const [bankAccounts] = useState([
-    {
-      id: 1,
-      bankName: "Kenya Commercial Bank",
-      accountNumber: "1234567890",
-      accountName: "Busia Technical Institute",
-      branchName: "Busia Branch",
-      branchCode: "011",
-      accountType: "Current",
-      purpose: "Operational",
-      status: "Active"
-    },
-    {
-      id: 2,
-      bankName: "Equity Bank",
-      accountNumber: "0987654321",
-      accountName: "BTI Capitation Account",
-      branchName: "Busia Branch",
-      branchCode: "068",
-      accountType: "Savings",
-      purpose: "Capitation",
-      status: "Active"
-    }
-  ]);
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!profile?.institution_id) return;
+
+    const fetchBankAccounts = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('bank_accounts')
+          .select('*')
+          .eq('institution_id', profile.institution_id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setBankAccounts(data || []);
+      } catch (error: any) {
+        console.error('Error fetching bank accounts:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load bank accounts",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBankAccounts();
+  }, [profile?.institution_id, toast]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Bank Account Added",
-      description: "New bank account has been successfully added to your institution.",
-    });
-    setShowForm(false);
-    setFormData({
-      bankName: "",
-      accountNumber: "",
-      accountName: "",
-      branchName: "",
-      branchCode: "",
-      accountType: "",
-      swiftCode: "",
-      purpose: "operational"
-    });
+    if (!profile?.institution_id) {
+      toast({
+        title: "Error",
+        description: "Institution not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const { error } = await supabase
+        .from('bank_accounts')
+        .insert({
+          institution_id: profile.institution_id,
+          bank_name: formData.bankName,
+          account_number: formData.accountNumber,
+          branch: formData.branchName,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Bank Account Added",
+        description: "New bank account has been successfully added to your institution.",
+      });
+
+      setShowForm(false);
+      setFormData({
+        bankName: "",
+        accountNumber: "",
+        accountName: "",
+        branchName: "",
+        branchCode: "",
+        accountType: "",
+        swiftCode: "",
+        purpose: "operational"
+      });
+
+      // Refresh list
+      const { data } = await supabase
+        .from('bank_accounts')
+        .select('*')
+        .eq('institution_id', profile.institution_id)
+        .order('created_at', { ascending: false });
+      
+      setBankAccounts(data || []);
+    } catch (error: any) {
+      console.error('Error adding bank account:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add bank account",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -190,9 +243,9 @@ export default function BankAccount() {
                 <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
                   Cancel
                 </Button>
-                <Button type="submit">
+                <Button type="submit" disabled={isSubmitting}>
                   <Save className="h-4 w-4 mr-2" />
-                  Save Account
+                  {isSubmitting ? "Saving..." : "Save Account"}
                 </Button>
               </div>
             </form>
@@ -206,56 +259,55 @@ export default function BankAccount() {
           <CardDescription>All registered bank accounts for your institution</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Bank Details</TableHead>
-                <TableHead>Account Information</TableHead>
-                <TableHead>Purpose</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {bankAccounts.map((account) => (
-                <TableRow key={account.id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{account.bankName}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {account.branchName} ({account.branchCode})
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{account.accountNumber}</p>
-                      <p className="text-sm text-muted-foreground">{account.accountName}</p>
-                      <Badge variant="outline" className="mt-1">
-                        {account.accountType}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{account.purpose}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="default">{account.status}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          {loading ? (
+            <div className="text-center py-8">Loading...</div>
+          ) : bankAccounts.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No bank accounts found. Add your first bank account.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Bank Details</TableHead>
+                  <TableHead>Account Information</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {bankAccounts.map((account) => (
+                  <TableRow key={account.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{account.bank_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {account.branch}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{account.account_number}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Added: {new Date(account.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

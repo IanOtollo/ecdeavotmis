@@ -1,36 +1,96 @@
+import { useState, useEffect } from "react";
 import { Users, Building2, GraduationCap, FileText, TrendingUp, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function Dashboard() {
-  const stats = [
+  const { profile } = useProfile();
+  const [stats, setStats] = useState({
+    totalLearners: 0,
+    ecdeLearners: 0,
+    vocationalStudents: 0,
+    activeCount: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!profile?.institution_id) return;
+
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+
+        // Fetch ECDE learners count
+        const { count: ecdeCount } = await supabase
+          .from('learners')
+          .select('*', { count: 'exact', head: true })
+          .eq('institution_id', profile.institution_id);
+
+        // Fetch Vocational students count
+        const { count: vocationalCount } = await supabase
+          .from('students')
+          .select('*', { count: 'exact', head: true })
+          .eq('institution_id', profile.institution_id);
+
+        // Fetch active learners count
+        const { count: activeLearners } = await supabase
+          .from('learners')
+          .select('*', { count: 'exact', head: true })
+          .eq('institution_id', profile.institution_id)
+          .eq('status', 'enrolled');
+
+        const { count: activeStudents } = await supabase
+          .from('students')
+          .select('*', { count: 'exact', head: true })
+          .eq('institution_id', profile.institution_id)
+          .eq('status', 'enrolled');
+
+        setStats({
+          totalLearners: (ecdeCount || 0) + (vocationalCount || 0),
+          ecdeLearners: ecdeCount || 0,
+          vocationalStudents: vocationalCount || 0,
+          activeCount: (activeLearners || 0) + (activeStudents || 0),
+        });
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [profile?.institution_id]);
+
+  const statCards = [
     {
       title: "Total Learners",
-      value: "0",
+      value: loading ? "..." : stats.totalLearners.toString(),
       change: "0%",
       icon: Users,
       color: "text-primary",
       bgColor: "bg-primary-light",
     },
     {
-      title: "Active Students",
-      value: "0",
+      title: "ECDE Learners",
+      value: loading ? "..." : stats.ecdeLearners.toString(),
       change: "0%", 
       icon: GraduationCap,
       color: "text-secondary",
       bgColor: "bg-secondary-light",
     },
     {
-      title: "Institutions",
-      value: "0",
+      title: "Vocational Students",
+      value: loading ? "..." : stats.vocationalStudents.toString(),
       change: "0%",
       icon: Building2,
       color: "text-accent",
       bgColor: "bg-accent-light",
     },
     {
-      title: "Reports Generated",
-      value: "0",
+      title: "Active Enrolled",
+      value: loading ? "..." : stats.activeCount.toString(),
       change: "0%",
       icon: FileText,
       color: "text-success",
@@ -38,7 +98,7 @@ export default function Dashboard() {
     },
   ];
 
-  const recentActivities = [];
+  const recentActivities: any[] = [];
 
   return (
     <div className="p-6 space-y-6">
@@ -52,7 +112,7 @@ export default function Dashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => (
+        {statCards.map((stat) => (
           <Card key={stat.title} className="card-hover">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">

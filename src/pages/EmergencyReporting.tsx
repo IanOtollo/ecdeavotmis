@@ -7,9 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function EmergencyReporting() {
   const { toast } = useToast();
+  const { profile } = useProfile();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     emergencyType: "",
     dateOccurred: "",
@@ -27,12 +31,59 @@ export default function EmergencyReporting() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Emergency Report Submitted",
-      description: "Your emergency report has been successfully recorded.",
-    });
+    
+    if (!profile?.institution_id) {
+      toast({
+        title: "Error",
+        description: "Institution not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const { error } = await supabase
+        .from('emergencies')
+        .insert({
+          institution_id: profile.institution_id,
+          calamity_name: formData.emergencyType,
+          reporting_date: formData.dateOccurred,
+          description: `${formData.description}\n\nLocation: ${formData.location}\nSeverity: ${formData.severity}\nInjuries: ${formData.injuries}\nDamage: ${formData.damageAssessment}\nResponse: ${formData.responseActions}`,
+          status: 'reported',
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Emergency Report Submitted",
+        description: "Your emergency report has been successfully recorded.",
+      });
+
+      setFormData({
+        emergencyType: "",
+        dateOccurred: "",
+        timeOccurred: "",
+        location: "",
+        description: "",
+        severity: "",
+        injuries: "",
+        damageAssessment: "",
+        responseActions: "",
+        status: "reported",
+      });
+    } catch (error: any) {
+      console.error('Error submitting emergency report:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit emergency report",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const emergencyTypes = [
@@ -172,9 +223,9 @@ export default function EmergencyReporting() {
         </Card>
 
         <div className="flex justify-end">
-          <Button type="submit" className="bg-gradient-primary hover:opacity-90">
+          <Button type="submit" className="bg-gradient-primary hover:opacity-90" disabled={isSubmitting}>
             <Save className="h-4 w-4 mr-2" />
-            Submit Emergency Report
+            {isSubmitting ? "Submitting..." : "Submit Emergency Report"}
           </Button>
         </div>
       </form>

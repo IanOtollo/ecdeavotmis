@@ -33,8 +33,8 @@ export function Header() {
             className="h-8 w-8 object-contain"
           />
           <div>
-            <h2 className="text-sm font-semibold text-foreground">SchoolBase Plus</h2>
-            <p className="text-xs text-muted-foreground">ECDEAVOTMIS</p>
+            <h2 className="text-sm font-semibold text-foreground">ECDEAVOTMIS</h2>
+            <p className="text-xs text-muted-foreground">Busia County</p>
           </div>
         </a>
       </div>

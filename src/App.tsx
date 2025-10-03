@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { Header } from "@/components/Header";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "./pages/Auth";
+import InitialSetup from "./pages/InitialSetup";
 import Dashboard from "./pages/Dashboard";
 import InstitutionBioData from "./pages/InstitutionBioData";
 import CaptureLearners from "./pages/CaptureLearners";
@@ -38,6 +39,7 @@ const App = () => {
         <Sonner />
         <Routes>
           <Route path="/login" element={<Auth />} />
+          <Route path="/setup" element={<InitialSetup />} />
           <Route
             path="/*"
             element={
