@@ -101,4 +101,4 @@ Deploy 🎉
 
 Author
 
-Developed by iantollo.vercel.app
+Developed by Ian Otollo.
