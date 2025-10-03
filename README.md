@@ -1,73 +1,104 @@
-# Welcome to your Lovable project
+ECDEAVOTMIS
 
-## Project info
+Education & Vocational Training Management Information System
 
-**URL**: https://lovable.dev/projects/0a8f4cce-00e2-40b5-841b-3e29a666a286
+A web-based system for managing Early Childhood Development Education (ECDE) centers and Vocational Training institutions. The system allows institutions to register, manage learners/students, track infrastructure, emergency reports, financial records, and generate reports.
 
-## How can I edit this code?
+Features
+🔹 Institution Management
 
-There are several ways of editing your application.
+Register & manage institutions
 
-**Use Lovable**
+Capture bio-data (type, level, county, ward, education system, ownership, KRA pin, etc.)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/0a8f4cce-00e2-40b5-841b-3e29a666a286) and start prompting.
+Upload supporting documents (certificates, ownership docs, compliance docs)
 
-Changes made via Lovable will be committed automatically to this repo.
+Manage infrastructure, bank accounts, capitation receipts, and school books
 
-**Use your preferred IDE**
+🔹 Learners (ECDE & Vocational)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Register learners/students with UPI auto-generation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+Capture personal info (first name, last name, other names, gender, DOB, photo)
 
-Follow these steps:
+Record admission details
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+View, search, update, and release learners
+
+Generate reports on admissions, learners per institution, and UPI lists
+
+🔹 Emergency Reporting
+
+Submit and track calamity reports per institution
+
+Capture incident type, date, description, response, and status
+
+🔹 Reports & Export
+
+Admission reports
+
+UPI lists
+
+Learner data export (CSV/Excel)
+
+Institution statistics
+
+🔹 Utilities
+
+Admin/User login & authentication
+
+Change password
+
+Logout
+
+Tech Stack
+
+Frontend: React + TypeScript + TailwindCSS + ShadCN UI
+
+Backend: Node.js / Express (API endpoints)
+
+Database: Supabase (PostgreSQL)
+
+Deployment: Vercel
+
+Getting Started
+Prerequisites
+
+Node.js (v18+) & npm
+
+Supabase account (for database)
+
+Vercel account (for deployment)
+
+Setup
+# Clone repository
 git clone <YOUR_GIT_URL>
+cd ecdeavotmis
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Install dependencies
+npm install
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Create an .env file and add your Supabase keys
+VITE_SUPABASE_URL=<your-supabase-url>
+VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
-```
 
-**Edit a file directly in GitHub**
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+The app will be available at http://localhost:5173
+.
 
-**Use GitHub Codespaces**
+Deployment
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Push your repo to GitHub
 
-## What technologies are used for this project?
+Link it with Vercel
 
-This project is built with:
+Set the environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) in Vercel dashboard
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Deploy 🎉
 
-## How can I deploy this project?
+Author
 
-Simply open [Lovable](https://lovable.dev/projects/0a8f4cce-00e2-40b5-841b-3e29a666a286) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Developed by Ian Otollo
