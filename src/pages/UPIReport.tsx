@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileBarChart, Search, Download, Filter, QrCode, Copy, Check } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,15 +8,90 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function UPIReport() {
   const { toast } = useToast();
+  const { profile } = useProfile();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [copiedUPI, setCopiedUPI] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [upiRecords, setUpiRecords] = useState<any[]>([]);
 
-  const [upiRecords] = useState([]);
+  useEffect(() => {
+    if (!profile?.institution_id) return;
+
+    const fetchUPIRecords = async () => {
+      try {
+        setLoading(true);
+
+        const { data: ecdeLearners, error: ecdeError } = await supabase
+          .from('learners')
+          .select('*')
+          .eq('institution_id', profile.institution_id);
+
+        if (ecdeError) throw ecdeError;
+
+        const { data: vocationalStudents, error: vocationalError } = await supabase
+          .from('students')
+          .select('*')
+          .eq('institution_id', profile.institution_id);
+
+        if (vocationalError) throw vocationalError;
+
+        const records = [
+          ...(ecdeLearners || []).map(l => ({
+            id: l.id,
+            upi: l.upi,
+            firstName: l.first_name,
+            lastName: l.last_name,
+            otherName: l.other_name,
+            gender: l.gender,
+            dateOfBirth: l.dob,
+            admissionDate: l.admission_date || l.created_at,
+            type: 'ecde',
+            status: l.status,
+            photo: l.photo,
+            course: 'ECDE',
+            level: 'Early Childhood',
+            generatedDate: l.created_at
+          })),
+          ...(vocationalStudents || []).map(s => ({
+            id: s.id,
+            upi: s.upi,
+            firstName: s.first_name,
+            lastName: s.last_name,
+            otherName: s.other_name,
+            gender: s.gender,
+            dateOfBirth: s.dob,
+            admissionDate: s.admission_date || s.created_at,
+            type: 'vocational',
+            status: s.status,
+            photo: s.photo,
+            course: 'Vocational Training',
+            level: 'Technical',
+            generatedDate: s.created_at
+          }))
+        ];
+
+        setUpiRecords(records);
+      } catch (error: any) {
+        console.error('Error fetching UPI records:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load UPI records",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUPIRecords();
+  }, [profile?.institution_id, toast]);
 
   const filteredRecords = upiRecords.filter(record => {
     const matchesSearch = 
@@ -26,7 +101,7 @@ export default function UPIReport() {
       record.course.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesType = filterType === "all" || record.type === filterType;
-    const matchesStatus = filterStatus === "all" || record.status.toLowerCase() === filterStatus;
+    const matchesStatus = filterStatus === "all" || record.status?.toLowerCase() === filterStatus;
     
     return matchesSearch && matchesType && matchesStatus;
   });
@@ -64,11 +139,18 @@ export default function UPIReport() {
     }
   };
 
-  // Summary statistics
   const totalUPIs = upiRecords.length;
-  const activeUPIs = upiRecords.filter(r => r.status === "Active").length;
+  const activeUPIs = upiRecords.filter(r => r.status === "enrolled").length;
   const ecdeUPIs = upiRecords.filter(r => r.type === "ecde").length;
   const vocationalUPIs = upiRecords.filter(r => r.type === "vocational").length;
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <p className="text-muted-foreground">Loading UPI records...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -115,7 +197,7 @@ export default function UPIReport() {
                 <p className="text-sm text-muted-foreground">Active UPIs</p>
                 <p className="text-3xl font-bold text-green-600">{activeUPIs}</p>
                 <p className="text-xs text-muted-foreground">
-                  {((activeUPIs / totalUPIs) * 100).toFixed(1)}% of total
+                  {totalUPIs > 0 ? ((activeUPIs / totalUPIs) * 100).toFixed(1) : 0}% of total
                 </p>
               </div>
               <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
@@ -184,7 +266,7 @@ export default function UPIReport() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="enrolled">Active</SelectItem>
                 <SelectItem value="transferred">Transferred</SelectItem>
                 <SelectItem value="graduated">Graduated</SelectItem>
                 <SelectItem value="suspended">Suspended</SelectItem>
@@ -208,144 +290,103 @@ export default function UPIReport() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student Information</TableHead>
-                <TableHead>UPI Details</TableHead>
-                <TableHead>Program Information</TableHead>
-                <TableHead>Demographics</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredRecords.map((record) => (
-                <TableRow key={record.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={record.photo || ""} />
-                        <AvatarFallback>{getInitials(record.firstName, record.lastName)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">
-                          {record.firstName} {record.lastName}
-                          {record.otherName && ` ${record.otherName}`}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{record.institution}</p>
+          {filteredRecords.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student Information</TableHead>
+                  <TableHead>UPI Details</TableHead>
+                  <TableHead>Program Information</TableHead>
+                  <TableHead>Demographics</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredRecords.map((record) => (
+                  <TableRow key={record.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarImage src={record.photo || ""} />
+                          <AvatarFallback>{getInitials(record.firstName, record.lastName)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">
+                            {record.firstName} {record.lastName}
+                            {record.otherName && ` ${record.otherName}`}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-mono font-bold text-primary text-lg">{record.upi}</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyUPI(record.upi)}
-                          className="h-6 w-6 p-0"
-                        >
-                          {copiedUPI === record.upi ? (
-                            <Check className="h-3 w-3 text-green-600" />
-                          ) : (
-                            <Copy className="h-3 w-3" />
-                          )}
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-mono font-bold text-primary text-lg">{record.upi}</p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copyUPI(record.upi)}
+                            className="h-6 w-6 p-0"
+                          >
+                            {copiedUPI === record.upi ? (
+                              <Check className="h-3 w-3 text-green-600" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Admitted: {new Date(record.admissionDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{record.course}</p>
+                        <p className="text-sm text-muted-foreground">{record.level}</p>
+                        <Badge variant="outline" className="mt-1">
+                          {record.type === 'ecde' ? 'ECDE' : 'Vocational'}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="text-sm"><strong>Gender:</strong> {record.gender}</p>
+                        <p className="text-sm"><strong>Age:</strong> {calculateAge(record.dateOfBirth)} years</p>
+                        <p className="text-sm text-muted-foreground">
+                          DOB: {new Date(record.dateOfBirth).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        record.status === 'enrolled' ? 'default' :
+                        record.status === 'transferred' ? 'secondary' :
+                        record.status === 'graduated' ? 'outline' : 'destructive'
+                      }>
+                        {record.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          <QrCode className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Download className="h-4 w-4" />
                         </Button>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Generated: {new Date(record.generatedDate).toLocaleDateString()}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Admitted: {new Date(record.admissionDate).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{record.course}</p>
-                      <p className="text-sm text-muted-foreground">{record.level}</p>
-                      <Badge variant="outline" className="mt-1">
-                        {record.type === 'ecde' ? 'ECDE' : 'Vocational'}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="text-sm"><strong>Gender:</strong> {record.gender}</p>
-                      <p className="text-sm"><strong>Age:</strong> {calculateAge(record.dateOfBirth)} years</p>
-                      <p className="text-sm text-muted-foreground">
-                        DOB: {new Date(record.dateOfBirth).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={
-                      record.status === 'Active' ? 'default' :
-                      record.status === 'Transferred' ? 'secondary' :
-                      record.status === 'Graduated' ? 'outline' : 'destructive'
-                    }>
-                      {record.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        <QrCode className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* UPI Format Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle>UPI Format Information</CardTitle>
-          <CardDescription>Understanding the UPI structure used in your institution</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="font-semibold mb-3">UPI Structure: B[Institution][Number]</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-primary rounded-full flex items-center justify-center">
-                    <span className="text-xs font-bold text-white">B</span>
-                  </div>
-                  <span><strong>B</strong> = Busia County identifier</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-                    <span className="text-xs font-bold text-white">T</span>
-                  </div>
-                  <span><strong>T</strong> = First letter of institution (Technical)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                    <span className="text-xs font-bold text-white">###</span>
-                  </div>
-                  <span><strong>001-999</strong> = Sequential student number</span>
-                </div>
-              </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground">No UPI records found</p>
             </div>
-            <div>
-              <h4 className="font-semibold mb-3">Example UPIs</h4>
-              <div className="space-y-2 text-sm font-mono">
-                <div className="p-2 bg-muted rounded">BT001 - First student at Busia Technical</div>
-                <div className="p-2 bg-muted rounded">BT025 - 25th student registered</div>
-                <div className="p-2 bg-muted rounded">BT156 - 156th student registered</div>
-              </div>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>

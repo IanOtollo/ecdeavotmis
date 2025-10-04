@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RefreshCw, Search, UserCheck, UserX } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function TransferLearners() {
   const { toast } = useToast();
+  const { profile } = useProfile();
   const [searchUPI, setSearchUPI] = useState("");
   const [transferData, setTransferData] = useState({
     transferType: "",
@@ -19,11 +22,9 @@ export default function TransferLearners() {
     effectiveDate: "",
     notes: "",
   });
-
-  // Mock learner data for demo
   const [foundLearner, setFoundLearner] = useState<any>(null);
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!searchUPI.trim()) {
       toast({
         title: "Enter UPI",
@@ -33,19 +34,76 @@ export default function TransferLearners() {
       return;
     }
 
-    // Simulate finding a learner
-    setFoundLearner({
-      upi: searchUPI,
-      firstName: "John",
-      lastName: "Doe",
-      gender: "Male",
-      program: "ECDE",
-      admissionDate: "2024-01-15",
-      status: "Active",
-    });
+    if (!profile?.institution_id) {
+      toast({
+        title: "Error",
+        description: "Institution not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data: ecde, error: ecdeError } = await supabase
+        .from('learners')
+        .select('*')
+        .eq('upi', searchUPI)
+        .eq('institution_id', profile.institution_id)
+        .single();
+
+      if (ecde) {
+        setFoundLearner({
+          id: ecde.id,
+          upi: ecde.upi,
+          firstName: ecde.first_name,
+          lastName: ecde.last_name,
+          gender: ecde.gender,
+          program: 'ECDE',
+          admissionDate: ecde.admission_date || ecde.created_at,
+          status: ecde.status,
+          type: 'learner'
+        });
+        return;
+      }
+
+      const { data: vocational, error: vocationalError } = await supabase
+        .from('students')
+        .select('*')
+        .eq('upi', searchUPI)
+        .eq('institution_id', profile.institution_id)
+        .single();
+
+      if (vocational) {
+        setFoundLearner({
+          id: vocational.id,
+          upi: vocational.upi,
+          firstName: vocational.first_name,
+          lastName: vocational.last_name,
+          gender: vocational.gender,
+          program: 'Vocational',
+          admissionDate: vocational.admission_date || vocational.created_at,
+          status: vocational.status,
+          type: 'student'
+        });
+        return;
+      }
+
+      toast({
+        title: "Not Found",
+        description: "No learner found with that UPI",
+        variant: "destructive",
+      });
+    } catch (error: any) {
+      console.error('Error searching learner:', error);
+      toast({
+        title: "Error",
+        description: "Failed to search for learner",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleTransfer = (type: string) => {
+  const handleTransfer = async (type: string) => {
     if (!foundLearner) {
       toast({
         title: "No Learner Selected",
@@ -55,21 +113,39 @@ export default function TransferLearners() {
       return;
     }
 
-    toast({
-      title: `${type === 'receive' ? 'Learner Received' : 'Learner Released'}`,
-      description: `${foundLearner.firstName} ${foundLearner.lastName} has been ${type === 'receive' ? 'received into' : 'released from'} this institution.`,
-    });
+    try {
+      const table = foundLearner.type === 'learner' ? 'learners' : 'students';
+      const newStatus = type === 'receive' ? 'enrolled' : 'transferred';
 
-    // Reset form
-    setFoundLearner(null);
-    setSearchUPI("");
-    setTransferData({
-      transferType: "",
-      targetInstitution: "",
-      reason: "",
-      effectiveDate: "",
-      notes: "",
-    });
+      const { error } = await supabase
+        .from(table)
+        .update({ status: newStatus })
+        .eq('id', foundLearner.id);
+
+      if (error) throw error;
+
+      toast({
+        title: `${type === 'receive' ? 'Learner Received' : 'Learner Released'}`,
+        description: `${foundLearner.firstName} ${foundLearner.lastName} has been ${type === 'receive' ? 'received into' : 'released from'} this institution.`,
+      });
+
+      setFoundLearner(null);
+      setSearchUPI("");
+      setTransferData({
+        transferType: "",
+        targetInstitution: "",
+        reason: "",
+        effectiveDate: "",
+        notes: "",
+      });
+    } catch (error: any) {
+      console.error('Error transferring learner:', error);
+      toast({
+        title: "Error",
+        description: "Failed to transfer learner",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

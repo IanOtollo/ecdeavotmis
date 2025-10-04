@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Building2, MapPin, Phone, Mail, Calendar, Users, Save } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Building2, MapPin, Phone, Save } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,39 +7,138 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function MyInstitution() {
   const { toast } = useToast();
+  const { profile } = useProfile();
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
-    institutionName: "Busia Technical Institute",
-    institutionCode: "BTI001",
-    institutionType: "technical",
-    registrationNumber: "REG/BTI/2020/001",
-    establishedDate: "2020-01-15",
-    address: "123 Main Street, Busia County",
-    county: "busia",
-    subCounty: "busia-central",
-    ward: "busia-ward-1",
-    phone: "+254700000000",
-    email: "info@busiatech.ac.ke",
-    website: "www.busiatech.ac.ke",
-    principalName: "Dr. Jane Doe",
-    totalStudents: "450",
-    totalStaff: "35",
-    description: "Leading technical institute providing quality vocational training and early childhood development education."
+    institutionName: "",
+    institutionCode: "",
+    institutionType: "",
+    registrationNumber: "",
+    establishedDate: "",
+    address: "",
+    county: "",
+    subCounty: "",
+    ward: "",
+    phone: "",
+    email: "",
+    website: "",
+    principalName: "",
+    totalStudents: "",
+    totalStaff: "",
+    description: ""
   });
+
+  useEffect(() => {
+    if (!profile?.institution_id) return;
+
+    const fetchInstitution = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('institutions')
+          .select('*')
+          .eq('id', profile.institution_id)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          setFormData({
+            institutionName: data.name || "",
+            institutionCode: data.unique_code || "",
+            institutionType: data.type || "",
+            registrationNumber: data.registration_no || "",
+            establishedDate: data.registration_date || "",
+            address: `${data.location || ""}, ${data.ward || ""}`,
+            county: data.county || "",
+            subCounty: data.subcounty || "",
+            ward: data.ward || "",
+            phone: "",
+            email: "",
+            website: "",
+            principalName: "",
+            totalStudents: "",
+            totalStaff: "",
+            description: ""
+          });
+        }
+      } catch (error: any) {
+        console.error('Error fetching institution:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load institution data",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInstitution();
+  }, [profile?.institution_id, toast]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Institution Profile Updated",
-      description: "Your institution information has been successfully updated.",
-    });
+    
+    if (!profile?.institution_id) {
+      toast({
+        title: "Error",
+        description: "Institution not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const { error } = await supabase
+        .from('institutions')
+        .update({
+          name: formData.institutionName,
+          unique_code: formData.institutionCode,
+          type: formData.institutionType,
+          registration_no: formData.registrationNumber,
+          registration_date: formData.establishedDate,
+          county: formData.county,
+          subcounty: formData.subCounty,
+          ward: formData.ward,
+        })
+        .eq('id', profile.institution_id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Institution Profile Updated",
+        description: "Your institution information has been successfully updated.",
+      });
+    } catch (error: any) {
+      console.error('Error updating institution:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update institution",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <p className="text-muted-foreground">Loading institution data...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -242,9 +341,9 @@ export default function MyInstitution() {
         </Card>
 
         <div className="flex justify-end">
-          <Button type="submit" className="bg-gradient-primary hover:opacity-90">
+          <Button type="submit" className="bg-gradient-primary hover:opacity-90" disabled={isSubmitting}>
             <Save className="h-4 w-4 mr-2" />
-            Update Institution Profile
+            {isSubmitting ? "Updating..." : "Update Institution Profile"}
           </Button>
         </div>
       </form>

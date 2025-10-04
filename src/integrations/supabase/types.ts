@@ -49,6 +49,65 @@ export type Database = {
           },
         ]
       }
+      books: {
+        Row: {
+          author: string | null
+          category: string | null
+          condition: string | null
+          created_at: string | null
+          id: number
+          institution_id: number | null
+          isbn: string | null
+          level: string | null
+          publisher: string | null
+          quantity: number | null
+          subject: string | null
+          title: string
+          unit_price: string | null
+          year_published: number | null
+        }
+        Insert: {
+          author?: string | null
+          category?: string | null
+          condition?: string | null
+          created_at?: string | null
+          id?: number
+          institution_id?: number | null
+          isbn?: string | null
+          level?: string | null
+          publisher?: string | null
+          quantity?: number | null
+          subject?: string | null
+          title: string
+          unit_price?: string | null
+          year_published?: number | null
+        }
+        Update: {
+          author?: string | null
+          category?: string | null
+          condition?: string | null
+          created_at?: string | null
+          id?: number
+          institution_id?: number | null
+          isbn?: string | null
+          level?: string | null
+          publisher?: string | null
+          quantity?: number | null
+          subject?: string | null
+          title?: string
+          unit_price?: string | null
+          year_published?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "books_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       capitation_receipts: {
         Row: {
           amount: number | null
@@ -256,7 +315,11 @@ export type Database = {
       learners: {
         Row: {
           admission_date: string | null
+          cause_of_death: string | null
           created_at: string | null
+          date_of_death: string | null
+          death_details: string | null
+          deceased: boolean | null
           dob: string | null
           first_name: string | null
           gender: string | null
@@ -270,7 +333,11 @@ export type Database = {
         }
         Insert: {
           admission_date?: string | null
+          cause_of_death?: string | null
           created_at?: string | null
+          date_of_death?: string | null
+          death_details?: string | null
+          deceased?: boolean | null
           dob?: string | null
           first_name?: string | null
           gender?: string | null
@@ -284,7 +351,11 @@ export type Database = {
         }
         Update: {
           admission_date?: string | null
+          cause_of_death?: string | null
           created_at?: string | null
+          date_of_death?: string | null
+          death_details?: string | null
+          deceased?: boolean | null
           dob?: string | null
           first_name?: string | null
           gender?: string | null
@@ -341,7 +412,11 @@ export type Database = {
       students: {
         Row: {
           admission_date: string | null
+          cause_of_death: string | null
           created_at: string | null
+          date_of_death: string | null
+          death_details: string | null
+          deceased: boolean | null
           dob: string | null
           first_name: string | null
           gender: string | null
@@ -355,7 +430,11 @@ export type Database = {
         }
         Insert: {
           admission_date?: string | null
+          cause_of_death?: string | null
           created_at?: string | null
+          date_of_death?: string | null
+          death_details?: string | null
+          deceased?: boolean | null
           dob?: string | null
           first_name?: string | null
           gender?: string | null
@@ -369,7 +448,11 @@ export type Database = {
         }
         Update: {
           admission_date?: string | null
+          cause_of_death?: string | null
           created_at?: string | null
+          date_of_death?: string | null
+          death_details?: string | null
+          deceased?: boolean | null
           dob?: string | null
           first_name?: string | null
           gender?: string | null

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Building2, MapPin, FileText, Upload, Save } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function InstitutionBioData() {
   const { toast } = useToast();
+  const { profile } = useProfile();
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     institutionType: "",
     institutionLevel: "",
@@ -31,17 +36,129 @@ export default function InstitutionBioData() {
     ownershipDocument: null as File | null,
   });
 
+  useEffect(() => {
+    if (!profile?.institution_id) return;
+
+    const fetchInstitution = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('institutions')
+          .select('*')
+          .eq('id', profile.institution_id)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          setFormData({
+            institutionType: data.type || "",
+            institutionLevel: data.level || "",
+            county: data.county || "",
+            subCounty: data.subcounty || "",
+            ward: data.ward || "",
+            zone: data.zone || "",
+            educationSystem: data.education_system || "",
+            kraPin: data.kra_pin || "",
+            registrationNumber: data.registration_no || "",
+            category: data.category || "",
+            latitude: data.geo_lat || "",
+            longitude: data.geo_lng || "",
+            ownership: data.ownership || "",
+            sbpCompliance: data.sbp_compliance || false,
+            nearestHealthFacility: data.nearest_health || "",
+            nearestPoliceStation: data.nearest_police || "",
+            ownershipDocument: null,
+          });
+        }
+      } catch (error: any) {
+        console.error('Error fetching institution:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInstitution();
+  }, [profile?.institution_id]);
+
   const handleInputChange = (field: string, value: string | boolean | File | null) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Institution Bio-data Updated",
-      description: "Your institution information has been successfully saved.",
-    });
+    
+    if (!profile?.institution_id) {
+      toast({
+        title: "Error",
+        description: "Institution not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      let ownershipDocPath = null;
+      if (formData.ownershipDocument) {
+        const fileExt = formData.ownershipDocument.name.split('.').pop();
+        const fileName = `${profile.institution_id}_ownership_${Date.now()}.${fileExt}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('receipts')
+          .upload(fileName, formData.ownershipDocument);
+
+        if (uploadError) throw uploadError;
+        ownershipDocPath = uploadData.path;
+      }
+
+      const { error } = await supabase
+        .from('institutions')
+        .update({
+          type: formData.institutionType,
+          level: formData.institutionLevel,
+          county: formData.county,
+          subcounty: formData.subCounty,
+          ward: formData.ward,
+          zone: formData.zone,
+          education_system: formData.educationSystem,
+          kra_pin: formData.kraPin,
+          registration_no: formData.registrationNumber,
+          category: formData.category,
+          geo_lat: formData.latitude,
+          geo_lng: formData.longitude,
+          ownership: formData.ownership,
+          sbp_compliance: formData.sbpCompliance,
+          nearest_health: formData.nearestHealthFacility,
+          nearest_police: formData.nearestPoliceStation,
+          ...(ownershipDocPath && { ownership_doc: ownershipDocPath }),
+        })
+        .eq('id', profile.institution_id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Institution Bio-data Updated",
+        description: "Your institution information has been successfully saved.",
+      });
+    } catch (error: any) {
+      console.error('Error updating institution:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save institution bio-data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <p className="text-muted-foreground">Loading institution data...</p>
+      </div>
+    );
+  }
 
   const counties = [
     "Nairobi", "Mombasa", "Kisumu", "Nakuru", "Uasin Gishu", "Kiambu", "Machakos", "Kajiado"
@@ -324,9 +441,9 @@ export default function InstitutionBioData() {
 
         {/* Submit Button */}
         <div className="flex justify-end">
-          <Button type="submit" className="bg-gradient-primary hover:opacity-90">
+          <Button type="submit" className="bg-gradient-primary hover:opacity-90" disabled={isSubmitting}>
             <Save className="h-4 w-4 mr-2" />
-            Save Institution Bio-data
+            {isSubmitting ? "Saving..." : "Save Institution Bio-data"}
           </Button>
         </div>
       </form>

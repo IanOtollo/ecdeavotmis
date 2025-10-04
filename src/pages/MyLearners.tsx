@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Users, Search, Filter, Download, Eye, Calendar, MapPin } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,99 +7,86 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function MyLearners() {
+  const { profile } = useProfile();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterClass, setFilterClass] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [myLearners, setMyLearners] = useState<any[]>([]);
 
-  const [myLearners] = useState([
-    {
-      id: 1,
-      upi: "BT001",
-      firstName: "John",
-      lastName: "Doe",
-      otherName: "Michael",
-      gender: "Male",
-      dateOfBirth: "2015-05-15",
-      type: "ecde",
-      course: "Early Childhood Development",
-      level: "Pre-Unit",
-      class: "Pre-Unit A",
-      admissionDate: "2024-01-15",
-      status: "Active",
-      attendance: 95,
-      guardianName: "Mary Doe",
-      guardianPhone: "+254700000001",
-      address: "Busia Town, Plot 123",
-      lastSeen: "2024-03-20",
-      photo: null
-    },
-    {
-      id: 2,
-      upi: "BT002",
-      firstName: "Jane",
-      lastName: "Smith",
-      otherName: "",
-      gender: "Female",
-      dateOfBirth: "2002-08-22",
-      type: "vocational",
-      course: "Electrical Technology",
-      level: "Certificate Level 2",
-      class: "Electrical Yr2",
-      admissionDate: "2024-02-01",
-      status: "Active",
-      attendance: 88,
-      guardianName: "Robert Smith",
-      guardianPhone: "+254700000002",
-      address: "Malaba Township",
-      lastSeen: "2024-03-19",
-      photo: null
-    },
-    {
-      id: 3,
-      upi: "BT003",
-      firstName: "Peter",
-      lastName: "Johnson",
-      otherName: "Paul",
-      gender: "Male",
-      dateOfBirth: "2016-03-10",
-      type: "ecde",
-      course: "Early Childhood Development",
-      level: "Baby Class",
-      class: "Baby Class B",
-      admissionDate: "2024-01-20",
-      status: "Active",
-      attendance: 92,
-      guardianName: "Susan Johnson",
-      guardianPhone: "+254700000003",
-      address: "Nangina Market Area",
-      lastSeen: "2024-03-20",
-      photo: null
-    },
-    {
-      id: 4,
-      upi: "BT004",
-      firstName: "Mary",
-      lastName: "Wilson",
-      otherName: "Grace",
-      gender: "Female",
-      dateOfBirth: "2003-11-05",
-      type: "vocational",
-      course: "Fashion Design & Textile",
-      level: "Diploma Year 1",
-      class: "Fashion Yr1",
-      admissionDate: "2024-01-10",
-      status: "Completed",
-      attendance: 97,
-      guardianName: "David Wilson",
-      guardianPhone: "+254700000004",
-      address: "Busia Central",
-      lastSeen: "2024-03-15",
-      photo: null
-    }
-  ]);
+  useEffect(() => {
+    if (!profile?.institution_id) return;
+
+    const fetchLearners = async () => {
+      try {
+        setLoading(true);
+
+        const { data: ecdeLearners, error: ecdeError } = await supabase
+          .from('learners')
+          .select('*')
+          .eq('institution_id', profile.institution_id)
+          .eq('deceased', false);
+
+        if (ecdeError) throw ecdeError;
+
+        const { data: vocationalStudents, error: vocationalError } = await supabase
+          .from('students')
+          .select('*')
+          .eq('institution_id', profile.institution_id)
+          .eq('deceased', false);
+
+        if (vocationalError) throw vocationalError;
+
+        const learners = [
+          ...(ecdeLearners || []).map(l => ({
+            id: l.id,
+            upi: l.upi,
+            firstName: l.first_name,
+            lastName: l.last_name,
+            otherName: l.other_name,
+            gender: l.gender,
+            dateOfBirth: l.dob,
+            type: 'ecde',
+            course: 'Early Childhood Development',
+            level: 'ECDE',
+            class: 'ECDE',
+            admissionDate: l.admission_date || l.created_at,
+            status: l.status,
+            photo: l.photo
+          })),
+          ...(vocationalStudents || []).map(s => ({
+            id: s.id,
+            upi: s.upi,
+            firstName: s.first_name,
+            lastName: s.last_name,
+            otherName: s.other_name,
+            gender: s.gender,
+            dateOfBirth: s.dob,
+            type: 'vocational',
+            course: 'Vocational Training',
+            level: 'Technical',
+            class: 'Vocational',
+            admissionDate: s.admission_date || s.created_at,
+            status: s.status,
+            photo: s.photo
+          }))
+        ];
+
+        setMyLearners(learners);
+      } catch (error: any) {
+        console.error('Error fetching learners:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLearners();
+  }, [profile?.institution_id]);
 
   const filteredLearners = myLearners.filter(learner => {
     const matchesSearch = 
@@ -109,7 +96,7 @@ export default function MyLearners() {
       learner.course.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesType = filterType === "all" || learner.type === filterType;
-    const matchesStatus = filterStatus === "all" || learner.status.toLowerCase() === filterStatus;
+    const matchesStatus = filterStatus === "all" || learner.status?.toLowerCase() === filterStatus;
     const matchesClass = filterClass === "all" || learner.class.toLowerCase().includes(filterClass.toLowerCase());
     
     return matchesSearch && matchesType && matchesStatus && matchesClass;
@@ -130,18 +117,18 @@ export default function MyLearners() {
     return age;
   };
 
-  const getAttendanceColor = (attendance: number) => {
-    if (attendance >= 95) return "text-green-600";
-    if (attendance >= 85) return "text-yellow-600";
-    return "text-red-600";
-  };
-
-  // Summary statistics
   const totalLearners = myLearners.length;
-  const activeLearners = myLearners.filter(l => l.status === "Active").length;
+  const activeLearners = myLearners.filter(l => l.status === "enrolled").length;
   const ecdeLearners = myLearners.filter(l => l.type === "ecde").length;
   const vocationalLearners = myLearners.filter(l => l.type === "vocational").length;
-  const averageAttendance = Math.round(myLearners.reduce((sum, l) => sum + l.attendance, 0) / totalLearners);
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <p className="text-muted-foreground">Loading learners...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -164,7 +151,7 @@ export default function MyLearners() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="text-center">
@@ -194,14 +181,6 @@ export default function MyLearners() {
             <div className="text-center">
               <p className="text-2xl font-bold text-purple-600">{vocationalLearners}</p>
               <p className="text-sm text-muted-foreground">Vocational</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-orange-600">{averageAttendance}%</p>
-              <p className="text-sm text-muted-foreground">Avg Attendance</p>
             </div>
           </CardContent>
         </Card>
@@ -235,8 +214,8 @@ export default function MyLearners() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="enrolled">Active</SelectItem>
+                <SelectItem value="graduated">Completed</SelectItem>
                 <SelectItem value="suspended">Suspended</SelectItem>
               </SelectContent>
             </Select>
@@ -246,10 +225,8 @@ export default function MyLearners() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Classes</SelectItem>
-                <SelectItem value="pre-unit">Pre-Unit</SelectItem>
-                <SelectItem value="baby">Baby Class</SelectItem>
-                <SelectItem value="electrical">Electrical</SelectItem>
-                <SelectItem value="fashion">Fashion</SelectItem>
+                <SelectItem value="ecde">ECDE</SelectItem>
+                <SelectItem value="vocational">Vocational</SelectItem>
               </SelectContent>
             </Select>
             <Button variant="outline">
@@ -270,95 +247,76 @@ export default function MyLearners() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student Info</TableHead>
-                <TableHead>Program & Class</TableHead>
-                <TableHead>Personal Details</TableHead>
-                <TableHead>Guardian Info</TableHead>
-                <TableHead>Performance</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredLearners.map((learner) => (
-                <TableRow key={learner.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={learner.photo || ""} />
-                        <AvatarFallback>{getInitials(learner.firstName, learner.lastName)}</AvatarFallback>
-                      </Avatar>
+          {filteredLearners.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student Info</TableHead>
+                  <TableHead>Program & Class</TableHead>
+                  <TableHead>Personal Details</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredLearners.map((learner) => (
+                  <TableRow key={learner.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarImage src={learner.photo || ""} />
+                          <AvatarFallback>{getInitials(learner.firstName, learner.lastName)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">
+                            {learner.firstName} {learner.lastName}
+                            {learner.otherName && ` ${learner.otherName}`}
+                          </p>
+                          <p className="text-sm text-muted-foreground">UPI: {learner.upi}</p>
+                          <Badge variant="outline" className="mt-1">
+                            {learner.type === 'ecde' ? 'ECDE' : 'Vocational'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
                       <div>
-                        <p className="font-medium">
-                          {learner.firstName} {learner.lastName}
-                          {learner.otherName && ` ${learner.otherName}`}
-                        </p>
-                        <p className="text-sm text-muted-foreground">UPI: {learner.upi}</p>
-                        <Badge variant="outline" className="mt-1">
-                          {learner.type === 'ecde' ? 'ECDE' : 'Vocational'}
+                        <p className="font-medium">{learner.course}</p>
+                        <p className="text-sm text-muted-foreground">{learner.level}</p>
+                        <Badge variant="secondary" className="mt-1">
+                          {learner.class}
                         </Badge>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{learner.course}</p>
-                      <p className="text-sm text-muted-foreground">{learner.level}</p>
-                      <Badge variant="secondary" className="mt-1">
-                        {learner.class}
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="text-sm"><strong>Age:</strong> {calculateAge(learner.dateOfBirth)} years</p>
+                        <p className="text-sm"><strong>Gender:</strong> {learner.gender}</p>
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                          <Calendar className="h-3 w-3" />
+                          <span>Admitted: {new Date(learner.admissionDate).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={learner.status === 'enrolled' ? 'default' : 'secondary'}>
+                        {learner.status}
                       </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="text-sm"><strong>Age:</strong> {calculateAge(learner.dateOfBirth)} years</p>
-                      <p className="text-sm"><strong>Gender:</strong> {learner.gender}</p>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                        <MapPin className="h-3 w-3" />
-                        <span>{learner.address}</span>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="text-sm font-medium">{learner.guardianName}</p>
-                      <p className="text-sm text-muted-foreground">{learner.guardianPhone}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className={`text-sm font-medium ${getAttendanceColor(learner.attendance)}`}>
-                        {learner.attendance}% Attendance
-                      </p>
-                      <div className="w-16 h-2 bg-gray-200 rounded-full mt-1">
-                        <div 
-                          className="h-2 bg-primary rounded-full" 
-                          style={{ width: `${learner.attendance}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        <Calendar className="h-3 w-3 inline mr-1" />
-                        Last seen: {new Date(learner.lastSeen).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={learner.status === 'Active' ? 'default' : 'secondary'}>
-                      {learner.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="outline" size="sm">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground">No learners found</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -1,86 +1,112 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BarChart3, Calendar, Download, Filter, TrendingUp, Users } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function AdmissionReport() {
+  const { profile } = useProfile();
   const [selectedYear, setSelectedYear] = useState("2024");
   const [selectedTerm, setSelectedTerm] = useState("all");
   const [selectedProgram, setSelectedProgram] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalAdmissions: 0,
+    ecdeAdmissions: 0,
+    vocationalAdmissions: 0,
+    maleStudents: 0,
+    femaleStudents: 0,
+    avgAge: 0
+  });
+  const [recentAdmissions, setRecentAdmissions] = useState<any[]>([]);
 
-  // Sample admission data
-  const admissionStats = {
-    totalAdmissions: 156,
-    ecdeAdmissions: 98,
-    vocationalAdmissions: 58,
-    maleStudents: 78,
-    femaleStudents: 78,
-    avgAge: 12.5
-  };
+  useEffect(() => {
+    if (!profile?.institution_id) return;
 
-  const monthlyAdmissions = [
-    { month: "January", ecde: 25, vocational: 15, total: 40 },
-    { month: "February", ecde: 20, vocational: 12, total: 32 },
-    { month: "March", ecde: 18, vocational: 8, total: 26 },
-    { month: "April", ecde: 15, vocational: 10, total: 25 },
-    { month: "May", ecde: 12, vocational: 7, total: 19 },
-    { month: "June", ecde: 8, vocational: 6, total: 14 }
-  ];
+    const fetchAdmissionData = async () => {
+      try {
+        setLoading(true);
 
-  const courseWiseAdmissions = [
-    { course: "Early Childhood Development", admissions: 98, percentage: 62.8 },
-    { course: "Electrical Technology", admissions: 18, percentage: 11.5 },
-    { course: "Mechanical Engineering", admissions: 15, percentage: 9.6 },
-    { course: "ICT", admissions: 12, percentage: 7.7 },
-    { course: "Fashion Design", admissions: 8, percentage: 5.1 },
-    { course: "Catering & Hotel Management", admissions: 5, percentage: 3.2 }
-  ];
+        // Fetch ECDE learners
+        const { data: ecdeLearners, error: ecdeError } = await supabase
+          .from('learners')
+          .select('*')
+          .eq('institution_id', profile.institution_id)
+          .eq('status', 'enrolled');
 
-  const recentAdmissions = [
-    {
-      id: 1,
-      upi: "BT001",
-      name: "John Doe Michael",
-      course: "Early Childhood Development",
-      admissionDate: "2024-01-15",
-      gender: "Male",
-      age: 6,
-      type: "ECDE"
-    },
-    {
-      id: 2,
-      upi: "BT002",
-      name: "Jane Smith",
-      course: "Electrical Technology",
-      admissionDate: "2024-02-01",
-      gender: "Female",
-      age: 19,
-      type: "Vocational"
-    },
-    {
-      id: 3,
-      upi: "BT003",
-      name: "Peter Johnson Paul",
-      course: "Early Childhood Development",
-      admissionDate: "2024-01-20",
-      gender: "Male",
-      age: 5,
-      type: "ECDE"
-    },
-    {
-      id: 4,
-      upi: "BT004",
-      name: "Mary Wilson Grace",
-      course: "Fashion Design & Textile",
-      admissionDate: "2024-01-10",
-      gender: "Female",
-      age: 20,
-      type: "Vocational"
-    }
-  ];
+        if (ecdeError) throw ecdeError;
+
+        // Fetch vocational students
+        const { data: vocationalStudents, error: vocationalError } = await supabase
+          .from('students')
+          .select('*')
+          .eq('institution_id', profile.institution_id)
+          .eq('status', 'enrolled');
+
+        if (vocationalError) throw vocationalError;
+
+        const allAdmissions = [...(ecdeLearners || []), ...(vocationalStudents || [])];
+        
+        const maleCount = allAdmissions.filter(a => a.gender?.toLowerCase() === 'male').length;
+        const femaleCount = allAdmissions.filter(a => a.gender?.toLowerCase() === 'female').length;
+
+        const ages = allAdmissions.map(a => {
+          if (!a.dob) return 0;
+          const today = new Date();
+          const birthDate = new Date(a.dob);
+          let age = today.getFullYear() - birthDate.getFullYear();
+          const monthDiff = today.getMonth() - birthDate.getMonth();
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+          }
+          return age;
+        });
+        const avgAge = ages.length > 0 ? ages.reduce((a, b) => a + b, 0) / ages.length : 0;
+
+        setStats({
+          totalAdmissions: allAdmissions.length,
+          ecdeAdmissions: (ecdeLearners || []).length,
+          vocationalAdmissions: (vocationalStudents || []).length,
+          maleStudents: maleCount,
+          femaleStudents: femaleCount,
+          avgAge: Math.round(avgAge * 10) / 10
+        });
+
+        const recent = allAdmissions
+          .sort((a, b) => new Date(b.admission_date || b.created_at).getTime() - new Date(a.admission_date || a.created_at).getTime())
+          .slice(0, 10)
+          .map(a => ({
+            id: a.id,
+            upi: a.upi,
+            name: `${a.first_name} ${a.last_name}`,
+            course: 'course' in a ? 'Vocational' : 'ECDE',
+            admissionDate: a.admission_date || a.created_at,
+            gender: a.gender,
+            type: 'course' in a ? 'Vocational' : 'ECDE'
+          }));
+
+        setRecentAdmissions(recent);
+      } catch (error: any) {
+        console.error('Error fetching admission data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAdmissionData();
+  }, [profile?.institution_id]);
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <p className="text-muted-foreground">Loading admission data...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -163,10 +189,10 @@ export default function AdmissionReport() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Admissions</p>
-                <p className="text-3xl font-bold text-primary">{admissionStats.totalAdmissions}</p>
+                <p className="text-3xl font-bold text-primary">{stats.totalAdmissions}</p>
                 <p className="text-xs text-green-600 flex items-center mt-1">
                   <TrendingUp className="h-3 w-3 mr-1" />
-                  +12% from last year
+                  Current year
                 </p>
               </div>
               <Users className="h-12 w-12 text-primary opacity-20" />
@@ -179,9 +205,9 @@ export default function AdmissionReport() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">ECDE Admissions</p>
-                <p className="text-3xl font-bold text-blue-600">{admissionStats.ecdeAdmissions}</p>
+                <p className="text-3xl font-bold text-blue-600">{stats.ecdeAdmissions}</p>
                 <p className="text-xs text-muted-foreground">
-                  {((admissionStats.ecdeAdmissions / admissionStats.totalAdmissions) * 100).toFixed(1)}% of total
+                  {stats.totalAdmissions > 0 ? ((stats.ecdeAdmissions / stats.totalAdmissions) * 100).toFixed(1) : 0}% of total
                 </p>
               </div>
               <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
@@ -196,9 +222,9 @@ export default function AdmissionReport() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Vocational Admissions</p>
-                <p className="text-3xl font-bold text-green-600">{admissionStats.vocationalAdmissions}</p>
+                <p className="text-3xl font-bold text-green-600">{stats.vocationalAdmissions}</p>
                 <p className="text-xs text-muted-foreground">
-                  {((admissionStats.vocationalAdmissions / admissionStats.totalAdmissions) * 100).toFixed(1)}% of total
+                  {stats.totalAdmissions > 0 ? ((stats.vocationalAdmissions / stats.totalAdmissions) * 100).toFixed(1) : 0}% of total
                 </p>
               </div>
               <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
@@ -213,8 +239,10 @@ export default function AdmissionReport() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Male Students</p>
-                <p className="text-2xl font-bold">{admissionStats.maleStudents}</p>
-                <p className="text-xs text-muted-foreground">50% of admissions</p>
+                <p className="text-2xl font-bold">{stats.maleStudents}</p>
+                <p className="text-xs text-muted-foreground">
+                  {stats.totalAdmissions > 0 ? ((stats.maleStudents / stats.totalAdmissions) * 100).toFixed(0) : 0}% of admissions
+                </p>
               </div>
               <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
                 <span className="text-xs font-bold text-blue-600">M</span>
@@ -228,8 +256,10 @@ export default function AdmissionReport() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Female Students</p>
-                <p className="text-2xl font-bold">{admissionStats.femaleStudents}</p>
-                <p className="text-xs text-muted-foreground">50% of admissions</p>
+                <p className="text-2xl font-bold">{stats.femaleStudents}</p>
+                <p className="text-xs text-muted-foreground">
+                  {stats.totalAdmissions > 0 ? ((stats.femaleStudents / stats.totalAdmissions) * 100).toFixed(0) : 0}% of admissions
+                </p>
               </div>
               <div className="h-8 w-8 bg-pink-100 rounded-full flex items-center justify-center">
                 <span className="text-xs font-bold text-pink-600">F</span>
@@ -243,7 +273,7 @@ export default function AdmissionReport() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Average Age</p>
-                <p className="text-2xl font-bold">{admissionStats.avgAge}</p>
+                <p className="text-2xl font-bold">{stats.avgAge}</p>
                 <p className="text-xs text-muted-foreground">years</p>
               </div>
               <Calendar className="h-8 w-8 text-primary opacity-60" />
@@ -252,96 +282,6 @@ export default function AdmissionReport() {
         </Card>
       </div>
 
-      {/* Monthly Trends */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Monthly Admission Trends</CardTitle>
-          <CardDescription>Admission patterns throughout the year</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Month</TableHead>
-                <TableHead>ECDE</TableHead>
-                <TableHead>Vocational</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Trend</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {monthlyAdmissions.map((month) => (
-                <TableRow key={month.month}>
-                  <TableCell className="font-medium">{month.month}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-blue-600">
-                      {month.ecde}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-green-600">
-                      {month.vocational}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-semibold">{month.total}</span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="w-20 h-2 bg-gray-200 rounded-full">
-                      <div 
-                        className="h-2 bg-primary rounded-full" 
-                        style={{ width: `${(month.total / 40) * 100}%` }}
-                      />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Course-wise Distribution */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Course-wise Admissions</CardTitle>
-          <CardDescription>Distribution of students across different courses</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Course/Program</TableHead>
-                <TableHead>Admissions</TableHead>
-                <TableHead>Percentage</TableHead>
-                <TableHead>Distribution</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {courseWiseAdmissions.map((course) => (
-                <TableRow key={course.course}>
-                  <TableCell className="font-medium">{course.course}</TableCell>
-                  <TableCell>
-                    <span className="font-semibold">{course.admissions}</span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{course.percentage}%</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="w-32 h-2 bg-gray-200 rounded-full">
-                      <div 
-                        className="h-2 bg-primary rounded-full" 
-                        style={{ width: `${course.percentage}%` }}
-                      />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
       {/* Recent Admissions */}
       <Card>
         <CardHeader>
@@ -349,50 +289,56 @@ export default function AdmissionReport() {
           <CardDescription>Latest students admitted to the institution</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student Details</TableHead>
-                <TableHead>Course/Program</TableHead>
-                <TableHead>Admission Date</TableHead>
-                <TableHead>Demographics</TableHead>
-                <TableHead>Type</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentAdmissions.map((student) => (
-                <TableRow key={student.id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{student.name}</p>
-                      <p className="text-sm text-muted-foreground">UPI: {student.upi}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <p className="font-medium">{student.course}</p>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-sm">
-                        {new Date(student.admissionDate).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="text-sm">{student.gender}, {student.age} years</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={student.type === 'ECDE' ? 'default' : 'secondary'}>
-                      {student.type}
-                    </Badge>
-                  </TableCell>
+          {recentAdmissions.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student Details</TableHead>
+                  <TableHead>Course/Program</TableHead>
+                  <TableHead>Admission Date</TableHead>
+                  <TableHead>Demographics</TableHead>
+                  <TableHead>Type</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {recentAdmissions.map((student) => (
+                  <TableRow key={student.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{student.name}</p>
+                        <p className="text-sm text-muted-foreground">UPI: {student.upi}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <p className="font-medium">{student.course}</p>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-sm">
+                          {new Date(student.admissionDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="text-sm">{student.gender}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={student.type === 'ECDE' ? 'default' : 'secondary'}>
+                        {student.type}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground">No admission records found</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

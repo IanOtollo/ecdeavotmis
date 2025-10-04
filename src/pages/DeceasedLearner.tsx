@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Skull, Search, Calendar, AlertCircle, Save, Eye } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,11 +10,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function DeceasedLearner() {
   const { toast } = useToast();
+  const { profile } = useProfile();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedLearner, setSelectedLearner] = useState(null);
+  const [selectedLearner, setSelectedLearner] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeLearners, setActiveLearners] = useState<any[]>([]);
+  const [deceasedRecords, setDeceasedRecords] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     dateOfDeath: "",
     causeOfDeath: "",
@@ -26,55 +33,105 @@ export default function DeceasedLearner() {
     additionalNotes: ""
   });
 
-  // Sample active learners
-  const activeLearners = [
-    {
-      id: 1,
-      upi: "BT001",
-      firstName: "John",
-      lastName: "Doe",
-      otherName: "Michael",
-      gender: "Male",
-      dateOfBirth: "2015-05-15",
-      type: "ecde",
-      course: "Early Childhood Development",
-      level: "Pre-Unit",
-      guardianName: "Mary Doe",
-      guardianPhone: "+254700000001",
-      photo: null
-    },
-    {
-      id: 2,
-      upi: "BT002",
-      firstName: "Jane",
-      lastName: "Smith",
-      otherName: "",
-      gender: "Female",
-      dateOfBirth: "2002-08-22",
-      type: "vocational",
-      course: "Electrical Technology",
-      level: "Certificate",
-      guardianName: "Robert Smith",
-      guardianPhone: "+254700000002",
-      photo: null
-    }
-  ];
+  useEffect(() => {
+    if (!profile?.institution_id) return;
 
-  // Sample deceased records
-  const [deceasedRecords] = useState([
-    {
-      id: 1,
-      upi: "BT010",
-      firstName: "Samuel",
-      lastName: "Mwangi",
-      dateOfDeath: "2024-03-15",
-      causeOfDeath: "Illness",
-      reportedBy: "Grace Mwangi",
-      reporterRelation: "Mother",
-      recordedDate: "2024-03-16",
-      status: "Verified"
-    }
-  ]);
+    const fetchLearners = async () => {
+      try {
+        setLoading(true);
+
+        const { data: ecdeLearners, error: ecdeError } = await supabase
+          .from('learners')
+          .select('*')
+          .eq('institution_id', profile.institution_id)
+          .eq('deceased', false);
+
+        if (ecdeError) throw ecdeError;
+
+        const { data: vocationalStudents, error: vocationalError } = await supabase
+          .from('students')
+          .select('*')
+          .eq('institution_id', profile.institution_id)
+          .eq('deceased', false);
+
+        if (vocationalError) throw vocationalError;
+
+        const learners = [
+          ...(ecdeLearners || []).map(l => ({
+            id: l.id,
+            upi: l.upi,
+            firstName: l.first_name,
+            lastName: l.last_name,
+            otherName: l.other_name,
+            gender: l.gender,
+            dateOfBirth: l.dob,
+            type: 'learner',
+            course: 'Early Childhood Development',
+            level: 'ECDE',
+            photo: l.photo
+          })),
+          ...(vocationalStudents || []).map(s => ({
+            id: s.id,
+            upi: s.upi,
+            firstName: s.first_name,
+            lastName: s.last_name,
+            otherName: s.other_name,
+            gender: s.gender,
+            dateOfBirth: s.dob,
+            type: 'student',
+            course: 'Vocational Training',
+            level: 'Technical',
+            photo: s.photo
+          }))
+        ];
+
+        setActiveLearners(learners);
+
+        const { data: ecdeDeceased } = await supabase
+          .from('learners')
+          .select('*')
+          .eq('institution_id', profile.institution_id)
+          .eq('deceased', true);
+
+        const { data: vocationalDeceased } = await supabase
+          .from('students')
+          .select('*')
+          .eq('institution_id', profile.institution_id)
+          .eq('deceased', true);
+
+        const deceased = [
+          ...(ecdeDeceased || []).map(l => ({
+            id: l.id,
+            upi: l.upi,
+            firstName: l.first_name,
+            lastName: l.last_name,
+            dateOfDeath: l.date_of_death,
+            causeOfDeath: l.cause_of_death,
+            status: 'Verified',
+            type: 'learner'
+          })),
+          ...(vocationalDeceased || []).map(s => ({
+            id: s.id,
+            upi: s.upi,
+            firstName: s.first_name,
+            lastName: s.last_name,
+            dateOfDeath: s.date_of_death,
+            causeOfDeath: s.cause_of_death,
+            status: 'Verified',
+            type: 'student'
+          }))
+        ];
+
+        setDeceasedRecords(deceased);
+      } catch (error: any) {
+        console.error('Error fetching learners:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLearners();
+  }, [profile?.institution_id]);
 
   const filteredLearners = activeLearners.filter(learner =>
     learner.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -86,7 +143,7 @@ export default function DeceasedLearner() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!selectedLearner) {
@@ -107,29 +164,67 @@ export default function DeceasedLearner() {
       return;
     }
 
-    toast({
-      title: "Deceased Record Created",
-      description: `Record for ${selectedLearner.firstName} ${selectedLearner.lastName} has been created and marked as deceased.`,
-    });
+    try {
+      setIsSubmitting(true);
+      const table = selectedLearner.type === 'learner' ? 'learners' : 'students';
+      const details = `Reported by: ${formData.reportedBy}\nRelation: ${formData.reporterRelation}\nContact: ${formData.reporterContact}\nPlace: ${formData.placeOfDeath}\nCertificate: ${formData.deathCertificateNumber}\nNotes: ${formData.additionalNotes}`;
 
-    // Reset form
-    setSelectedLearner(null);
-    setFormData({
-      dateOfDeath: "",
-      causeOfDeath: "",
-      placeOfDeath: "",
-      reportedBy: "",
-      reporterRelation: "",
-      reporterContact: "",
-      deathCertificateNumber: "",
-      additionalNotes: ""
-    });
-    setSearchTerm("");
+      const { error } = await supabase
+        .from(table)
+        .update({
+          deceased: true,
+          date_of_death: formData.dateOfDeath,
+          cause_of_death: formData.causeOfDeath,
+          death_details: details,
+          status: 'deceased'
+        })
+        .eq('id', selectedLearner.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Deceased Record Created",
+        description: `Record for ${selectedLearner.firstName} ${selectedLearner.lastName} has been created and marked as deceased.`,
+      });
+
+      setSelectedLearner(null);
+      setFormData({
+        dateOfDeath: "",
+        causeOfDeath: "",
+        placeOfDeath: "",
+        reportedBy: "",
+        reporterRelation: "",
+        reporterContact: "",
+        deathCertificateNumber: "",
+        additionalNotes: ""
+      });
+      setSearchTerm("");
+
+      const updatedLearners = activeLearners.filter(l => l.id !== selectedLearner.id);
+      setActiveLearners(updatedLearners);
+    } catch (error: any) {
+      console.error('Error creating deceased record:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create deceased record",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <p className="text-muted-foreground">Loading learner data...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -349,9 +444,9 @@ export default function DeceasedLearner() {
               </div>
 
               <div className="flex justify-end">
-                <Button type="submit" variant="destructive">
+                <Button type="submit" variant="destructive" disabled={isSubmitting}>
                   <Save className="h-4 w-4 mr-2" />
-                  Record as Deceased
+                  {isSubmitting ? "Recording..." : "Record as Deceased"}
                 </Button>
               </div>
             </form>
@@ -366,52 +461,51 @@ export default function DeceasedLearner() {
           <CardDescription>Recently recorded deceased learners</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Learner Details</TableHead>
-                <TableHead>Death Information</TableHead>
-                <TableHead>Reported By</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {deceasedRecords.map((record) => (
-                <TableRow key={record.id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{record.firstName} {record.lastName}</p>
-                      <p className="text-sm text-muted-foreground">UPI: {record.upi}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="text-sm">
-                        <Calendar className="h-3 w-3 inline mr-1" />
-                        {new Date(record.dateOfDeath).toLocaleDateString()}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{record.causeOfDeath}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="text-sm font-medium">{record.reportedBy}</p>
-                      <p className="text-sm text-muted-foreground">{record.reporterRelation}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{record.status}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="outline" size="sm">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+          {deceasedRecords.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Learner Details</TableHead>
+                  <TableHead>Death Information</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {deceasedRecords.map((record) => (
+                  <TableRow key={record.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{record.firstName} {record.lastName}</p>
+                        <p className="text-sm text-muted-foreground">UPI: {record.upi}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="text-sm">
+                          <Calendar className="h-3 w-3 inline mr-1" />
+                          {new Date(record.dateOfDeath).toLocaleDateString()}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{record.causeOfDeath}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{record.status}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground">No deceased records found</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BookOpen, Plus, Search, Edit, Trash2, Save } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,11 +8,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function SchoolBooks() {
   const { toast } = useToast();
+  const { profile } = useProfile();
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [books, setBooks] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     title: "",
     author: "",
@@ -27,39 +33,121 @@ export default function SchoolBooks() {
     condition: "new"
   });
 
-  const [books] = useState([]);
+  useEffect(() => {
+    if (!profile?.institution_id) return;
+
+    const fetchBooks = async () => {
+      try {
+        setLoading(true);
+
+        const { data, error } = await supabase
+          .from('books')
+          .select('*')
+          .eq('institution_id', profile.institution_id);
+
+        if (error) throw error;
+
+        setBooks(data || []);
+      } catch (error: any) {
+        console.error('Error fetching books:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load books",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBooks();
+  }, [profile?.institution_id, toast]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Book Added Successfully",
-      description: `"${formData.title}" has been added to the school library inventory.`,
-    });
-    setShowForm(false);
-    setFormData({
-      title: "",
-      author: "",
-      isbn: "",
-      category: "",
-      level: "",
-      subject: "",
-      publisher: "",
-      yearPublished: "",
-      quantity: "",
-      unitPrice: "",
-      condition: "new"
-    });
+
+    if (!profile?.institution_id) {
+      toast({
+        title: "Error",
+        description: "Institution not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      const { data, error } = await supabase
+        .from('books')
+        .insert({
+          institution_id: profile.institution_id,
+          title: formData.title,
+          author: formData.author,
+          isbn: formData.isbn,
+          category: formData.category,
+          level: formData.level,
+          subject: formData.subject,
+          publisher: formData.publisher,
+          year_published: formData.yearPublished ? parseInt(formData.yearPublished) : null,
+          quantity: formData.quantity ? parseInt(formData.quantity) : 0,
+          unit_price: formData.unitPrice,
+          condition: formData.condition
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Book Added Successfully",
+        description: `"${formData.title}" has been added to the school library inventory.`,
+      });
+
+      setBooks([...books, data]);
+      setShowForm(false);
+      setFormData({
+        title: "",
+        author: "",
+        isbn: "",
+        category: "",
+        level: "",
+        subject: "",
+        publisher: "",
+        yearPublished: "",
+        quantity: "",
+        unitPrice: "",
+        condition: "new"
+      });
+    } catch (error: any) {
+      console.error('Error adding book:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add book",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const filteredBooks = books.filter(book =>
     book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    book.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    book.subject.toLowerCase().includes(searchTerm.toLowerCase())
+    book.author?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    book.subject?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <p className="text-muted-foreground">Loading books...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -211,7 +299,7 @@ export default function SchoolBooks() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="condition">Condition</Label>
-                  <Select onValueChange={(value) => handleInputChange("condition", value)}>
+                  <Select value={formData.condition} onValueChange={(value) => handleInputChange("condition", value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select condition" />
                     </SelectTrigger>
@@ -229,9 +317,9 @@ export default function SchoolBooks() {
                 <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
                   Cancel
                 </Button>
-                <Button type="submit">
+                <Button type="submit" disabled={isSubmitting}>
                   <Save className="h-4 w-4 mr-2" />
-                  Add Book
+                  {isSubmitting ? "Adding..." : "Add Book"}
                 </Button>
               </div>
             </form>
@@ -249,64 +337,72 @@ export default function SchoolBooks() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Book Details</TableHead>
-                <TableHead>Category & Level</TableHead>
-                <TableHead>Publisher Info</TableHead>
-                <TableHead>Inventory</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredBooks.map((book) => (
-                <TableRow key={book.id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{book.title}</p>
-                      <p className="text-sm text-muted-foreground">by {book.author}</p>
-                      <p className="text-xs text-muted-foreground">ISBN: {book.isbn}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <Badge variant="outline">{book.category}</Badge>
-                      <div className="text-sm">
-                        <p><strong>Level:</strong> {book.level}</p>
-                        <p><strong>Subject:</strong> {book.subject}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <p><strong>Publisher:</strong> {book.publisher}</p>
-                      <p><strong>Year:</strong> {book.yearPublished}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">Qty: {book.quantity}</p>
-                      <p className="text-sm text-muted-foreground">{book.unitPrice}</p>
-                      <Badge variant="secondary" className="mt-1">
-                        {book.condition}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          {filteredBooks.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Book Details</TableHead>
+                  <TableHead>Category & Level</TableHead>
+                  <TableHead>Publisher Info</TableHead>
+                  <TableHead>Inventory</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredBooks.map((book) => (
+                  <TableRow key={book.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{book.title}</p>
+                        <p className="text-sm text-muted-foreground">by {book.author}</p>
+                        {book.isbn && <p className="text-xs text-muted-foreground">ISBN: {book.isbn}</p>}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        {book.category && <Badge variant="outline">{book.category}</Badge>}
+                        <div className="text-sm">
+                          {book.level && <p><strong>Level:</strong> {book.level}</p>}
+                          {book.subject && <p><strong>Subject:</strong> {book.subject}</p>}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        {book.publisher && <p><strong>Publisher:</strong> {book.publisher}</p>}
+                        {book.year_published && <p><strong>Year:</strong> {book.year_published}</p>}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">Qty: {book.quantity}</p>
+                        {book.unit_price && <p className="text-sm text-muted-foreground">{book.unit_price}</p>}
+                        {book.condition && (
+                          <Badge variant="secondary" className="mt-1">
+                            {book.condition}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground">No books found</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

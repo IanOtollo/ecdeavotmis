@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Filter, UserSearch, Download, Eye, Calendar } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function SearchLearners() {
+  const { profile } = useProfile();
   const [searchFilters, setSearchFilters] = useState({
     searchTerm: "",
     type: "all",
@@ -20,11 +23,76 @@ export default function SearchLearners() {
     ageRange: "all"
   });
 
-  const [searchResults, setSearchResults] = useState([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [allLearners, setAllLearners] = useState<any[]>([]);
 
-  // Data will be loaded from Supabase
-  const allLearners = [];
+  useEffect(() => {
+    if (!profile?.institution_id) return;
+
+    const fetchLearners = async () => {
+      try {
+        const { data: ecdeLearners, error: ecdeError } = await supabase
+          .from('learners')
+          .select('*')
+          .eq('institution_id', profile.institution_id)
+          .eq('deceased', false);
+
+        if (ecdeError) throw ecdeError;
+
+        const { data: vocationalStudents, error: vocationalError } = await supabase
+          .from('students')
+          .select('*')
+          .eq('institution_id', profile.institution_id)
+          .eq('deceased', false);
+
+        if (vocationalError) throw vocationalError;
+
+        const learners = [
+          ...(ecdeLearners || []).map(l => ({
+            id: l.id,
+            upi: l.upi,
+            firstName: l.first_name,
+            lastName: l.last_name,
+            otherName: l.other_name,
+            gender: l.gender,
+            dateOfBirth: l.dob,
+            type: 'ecde',
+            course: 'Early Childhood Development',
+            level: 'ECDE',
+            admissionDate: l.admission_date || l.created_at,
+            status: l.status,
+            photo: l.photo,
+            guardianName: 'Not recorded',
+            guardianPhone: 'Not recorded'
+          })),
+          ...(vocationalStudents || []).map(s => ({
+            id: s.id,
+            upi: s.upi,
+            firstName: s.first_name,
+            lastName: s.last_name,
+            otherName: s.other_name,
+            gender: s.gender,
+            dateOfBirth: s.dob,
+            type: 'vocational',
+            course: 'Vocational Training',
+            level: 'Technical',
+            admissionDate: s.admission_date || s.created_at,
+            status: s.status,
+            photo: s.photo,
+            guardianName: 'Not recorded',
+            guardianPhone: 'Not recorded'
+          }))
+        ];
+
+        setAllLearners(learners);
+      } catch (error: any) {
+        console.error('Error fetching learners:', error);
+      }
+    };
+
+    fetchLearners();
+  }, [profile?.institution_id]);
 
   const handleFilterChange = (field: string, value: string) => {
     setSearchFilters(prev => ({ ...prev, [field]: value }));
@@ -48,7 +116,6 @@ export default function SearchLearners() {
   const performSearch = () => {
     setIsSearching(true);
     
-    // Simulate search delay
     setTimeout(() => {
       const filtered = allLearners.filter(learner => {
         const matchesSearch = !searchFilters.searchTerm || 
@@ -58,8 +125,8 @@ export default function SearchLearners() {
           learner.course.toLowerCase().includes(searchFilters.searchTerm.toLowerCase());
         
         const matchesType = searchFilters.type === "all" || learner.type === searchFilters.type;
-        const matchesGender = searchFilters.gender === "all" || learner.gender.toLowerCase() === searchFilters.gender;
-        const matchesStatus = searchFilters.status === "all" || learner.status.toLowerCase() === searchFilters.status;
+        const matchesGender = searchFilters.gender === "all" || learner.gender?.toLowerCase() === searchFilters.gender;
+        const matchesStatus = searchFilters.status === "all" || learner.status?.toLowerCase() === searchFilters.status;
         const matchesCourse = searchFilters.course === "all" || learner.course.toLowerCase().includes(searchFilters.course.toLowerCase());
         
         const admissionYear = new Date(learner.admissionDate).getFullYear().toString();
@@ -77,7 +144,7 @@ export default function SearchLearners() {
       
       setSearchResults(filtered);
       setIsSearching(false);
-    }, 1000);
+    }, 500);
   };
 
   return (
@@ -162,28 +229,10 @@ export default function SearchLearners() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="enrolled">Active</SelectItem>
                   <SelectItem value="graduated">Graduated</SelectItem>
                   <SelectItem value="suspended">Suspended</SelectItem>
                   <SelectItem value="transferred">Transferred</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Course/Program</Label>
-              <Select value={searchFilters.course} onValueChange={(value) => handleFilterChange("course", value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Courses</SelectItem>
-                  <SelectItem value="early childhood">Early Childhood Development</SelectItem>
-                  <SelectItem value="electrical">Electrical Technology</SelectItem>
-                  <SelectItem value="mechanical">Mechanical Engineering</SelectItem>
-                  <SelectItem value="ict">ICT</SelectItem>
-                  <SelectItem value="fashion">Fashion Design</SelectItem>
-                  <SelectItem value="catering">Catering & Hotel Management</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -269,7 +318,6 @@ export default function SearchLearners() {
                   <TableHead>Student Info</TableHead>
                   <TableHead>Personal Details</TableHead>
                   <TableHead>Program</TableHead>
-                  <TableHead>Guardian</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -312,12 +360,6 @@ export default function SearchLearners() {
                           <Calendar className="h-3 w-3 inline mr-1" />
                           Admitted: {new Date(learner.admissionDate).toLocaleDateString()}
                         </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="text-sm font-medium">{learner.guardianName}</p>
-                        <p className="text-sm text-muted-foreground">{learner.guardianPhone}</p>
                       </div>
                     </TableCell>
                     <TableCell>
