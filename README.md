@@ -86,7 +86,7 @@ VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 npm run dev
 
 
-The app will be available at http://localhost:5173
+The app will be available at http://localhost:5173 //or the available localhost set by your local PC environment 
 .
 
 Deployment
@@ -97,7 +97,7 @@ Link it with Vercel
 
 Set the environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) in Vercel dashboard
 
-Deploy 🎉
+Deploy 
 
 Author
 
