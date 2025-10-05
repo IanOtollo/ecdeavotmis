@@ -1,302 +1,216 @@
-import { useState } from "react";
-import { Shield, Building2, User, ArrowRight } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { CheckCircle2, Building2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function InitialSetup() {
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Super Admin Creation
-  const [adminEmail, setAdminEmail] = useState("");
-  const [adminPassword, setAdminPassword] = useState("");
-  const [adminName, setAdminName] = useState("");
+  // Institution fields
+  const [institutionName, setInstitutionName] = useState('');
+  const [institutionType, setInstitutionType] = useState('ECDE');
+  const [institutionLevel, setInstitutionLevel] = useState('ECDE');
+  const [registrationNo, setRegistrationNo] = useState('');
 
-  // Institution Creation
-  const [institutionName, setInstitutionName] = useState("");
-  const [institutionType, setInstitutionType] = useState("");
-  const [registrationNo, setRegistrationNo] = useState("");
-
-  const handleCreateSuperAdmin = async () => {
-    try {
-      setIsLoading(true);
-
-      // First, create the user account
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: adminEmail,
-        password: adminPassword,
-        options: {
-          data: {
-            full_name: adminName,
-          },
-          emailRedirectTo: `${window.location.origin}/`,
-        },
-      });
-
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("User creation failed");
-
-      // Then assign super_admin role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: authData.user.id,
-          role: 'super_admin',
-        });
-
-      if (roleError) throw roleError;
-
-      toast({
-        title: "Super Admin Created",
-        description: `Admin account created for ${adminEmail}. Please verify the email.`,
-      });
-
-      setStep(2);
-    } catch (error: any) {
-      console.error('Error creating super admin:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create super admin",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    // Redirect if not logged in
+    if (!user) {
+      navigate('/auth');
     }
-  };
+  }, [user, navigate]);
 
-  const handleCreateInstitution = async () => {
+  const handleCreateInstitutionAndAssign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!user) {
+      toast({
+        title: 'Error',
+        description: 'You must be logged in to create an institution',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
     try {
-      setIsLoading(true);
-
-      const { error } = await supabase
+      // Create the institution
+      const { data: institution, error: institutionError } = await supabase
         .from('institutions')
         .insert({
           name: institutionName,
           type: institutionType,
+          level: institutionLevel,
           registration_no: registrationNo,
           county: 'Busia',
-        });
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (institutionError) throw institutionError;
+
+      // Update user profile with institution_id
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ institution_id: institution.id })
+        .eq('id', user.id);
+
+      if (profileError) throw profileError;
+
+      // Check if user already has roles
+      const { data: existingRoles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      // If no roles, assign institution_admin role
+      if (!existingRoles || existingRoles.length === 0) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({
+            user_id: user.id,
+            role: 'institution_admin',
+          });
+
+        if (roleError) throw roleError;
+      }
 
       toast({
-        title: "Institution Created",
-        description: `${institutionName} has been successfully created.`,
+        title: 'Success',
+        description: 'Institution created and assigned successfully!',
       });
 
-      setStep(3);
+      setStep(2);
     } catch (error: any) {
       console.error('Error creating institution:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to create institution",
-        variant: "destructive",
+        title: 'Error',
+        description: error.message || 'Failed to create institution',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (!user) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10 p-4">
-      <div className="w-full max-w-2xl space-y-6">
-        {/* Progress Indicator */}
-        <div className="flex items-center justify-center gap-4">
-          <div className={`flex items-center gap-2 ${step >= 1 ? 'text-primary' : 'text-muted-foreground'}`}>
-            <div className={`h-8 w-8 rounded-full flex items-center justify-center ${step >= 1 ? 'bg-primary text-white' : 'bg-muted'}`}>
-              1
-            </div>
-            <span className="text-sm font-medium">Super Admin</span>
+      <Card className="w-full max-w-2xl">
+        <CardHeader className="text-center">
+          <img 
+            src="/src/assets/busia-county-logo.png" 
+            alt="Busia County" 
+            className="h-20 mx-auto mb-4"
+          />
+          <CardTitle className="text-2xl">ECDEAVOTMIS Setup</CardTitle>
+          <CardDescription>
+            Complete your setup by creating your institution profile
+          </CardDescription>
+          
+          {/* Progress Indicator */}
+          <div className="flex justify-center gap-2 mt-6">
+            <div className={`h-2 w-32 rounded-full ${step >= 1 ? 'bg-primary' : 'bg-gray-200'}`} />
+            <div className={`h-2 w-32 rounded-full ${step >= 2 ? 'bg-primary' : 'bg-gray-200'}`} />
           </div>
-          <ArrowRight className="h-4 w-4 text-muted-foreground" />
-          <div className={`flex items-center gap-2 ${step >= 2 ? 'text-primary' : 'text-muted-foreground'}`}>
-            <div className={`h-8 w-8 rounded-full flex items-center justify-center ${step >= 2 ? 'bg-primary text-white' : 'bg-muted'}`}>
-              2
-            </div>
-            <span className="text-sm font-medium">Institution</span>
-          </div>
-          <ArrowRight className="h-4 w-4 text-muted-foreground" />
-          <div className={`flex items-center gap-2 ${step >= 3 ? 'text-primary' : 'text-muted-foreground'}`}>
-            <div className={`h-8 w-8 rounded-full flex items-center justify-center ${step >= 3 ? 'bg-primary text-white' : 'bg-muted'}`}>
-              3
-            </div>
-            <span className="text-sm font-medium">Complete</span>
-          </div>
-        </div>
+        </CardHeader>
 
-        {/* Step 1: Create Super Admin */}
-        {step === 1 && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Shield className="h-6 w-6 text-primary" />
-                <CardTitle>Create Super Admin Account</CardTitle>
+        <CardContent className="space-y-6">
+          {/* Step 1: Create Institution */}
+          {step === 1 && (
+            <form onSubmit={handleCreateInstitutionAndAssign} className="space-y-4">
+              <div className="text-center mb-6">
+                <Building2 className="h-12 w-12 text-primary mx-auto mb-2" />
+                <h3 className="text-xl font-semibold">Create Your Institution</h3>
+                <p className="text-sm text-muted-foreground">Set up your school or training center</p>
               </div>
-              <CardDescription>
-                This account will have full access to manage all institutions and users in the system.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="adminName">Full Name</Label>
-                <Input
-                  id="adminName"
-                  placeholder="John Doe"
-                  value={adminName}
-                  onChange={(e) => setAdminName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="adminEmail">Email Address</Label>
-                <Input
-                  id="adminEmail"
-                  type="email"
-                  placeholder="admin@example.com"
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="adminPassword">Password</Label>
-                <Input
-                  id="adminPassword"
-                  type="password"
-                  placeholder="••••••••"
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  Password must be at least 6 characters long
-                </p>
-              </div>
-              <Button
-                onClick={handleCreateSuperAdmin}
-                disabled={isLoading || !adminEmail || !adminPassword || !adminName}
-                className="w-full"
-              >
-                {isLoading ? "Creating..." : "Create Super Admin"}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
 
-        {/* Step 2: Create First Institution */}
-        {step === 2 && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Building2 className="h-6 w-6 text-primary" />
-                <CardTitle>Create First Institution</CardTitle>
-              </div>
-              <CardDescription>
-                Add your first ECDE or Vocational training institution to the system.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="institutionName">Institution Name</Label>
+                <Label htmlFor="institution-name">Institution Name *</Label>
                 <Input
-                  id="institutionName"
-                  placeholder="Busia Technical Institute"
+                  id="institution-name"
+                  type="text"
+                  placeholder="Example ECDE Center / Vocational Institute"
                   value={institutionName}
                   onChange={(e) => setInstitutionName(e.target.value)}
                   required
                 />
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="institutionType">Institution Type</Label>
-                <select
-                  id="institutionType"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={institutionType}
-                  onChange={(e) => setInstitutionType(e.target.value)}
-                  required
-                >
-                  <option value="">Select type...</option>
-                  <option value="ECDE">ECDE (Early Childhood Development)</option>
-                  <option value="Vocational">Vocational Training Center</option>
-                  <option value="Both">Both ECDE & Vocational</option>
-                </select>
+                <Label htmlFor="institution-type">Institution Type *</Label>
+                <Select value={institutionType} onValueChange={setInstitutionType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ECDE">ECDE Center</SelectItem>
+                    <SelectItem value="Vocational">Vocational Training Center</SelectItem>
+                    <SelectItem value="Both">ECDE & Vocational</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="registrationNo">Registration Number</Label>
+                <Label htmlFor="institution-level">Institution Level *</Label>
+                <Select value={institutionLevel} onValueChange={setInstitutionLevel}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ECDE">ECDE</SelectItem>
+                    <SelectItem value="Vocational">Vocational</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="registration-no">Registration Number *</Label>
                 <Input
-                  id="registrationNo"
-                  placeholder="REG-2024-001"
+                  id="registration-no"
+                  type="text"
+                  placeholder="REG123456"
                   value={registrationNo}
                   onChange={(e) => setRegistrationNo(e.target.value)}
+                  required
                 />
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setStep(1)}
-                  className="flex-1"
-                >
-                  Back
-                </Button>
-                <Button
-                  onClick={handleCreateInstitution}
-                  disabled={isLoading || !institutionName || !institutionType}
-                  className="flex-1"
-                >
-                  {isLoading ? "Creating..." : "Create Institution"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
-        {/* Step 3: Setup Complete */}
-        {step === 3 && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <User className="h-6 w-6 text-success" />
-                <CardTitle>Setup Complete!</CardTitle>
-              </div>
-              <CardDescription>
-                Your ECDEAVOTMIS system is ready to use.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-success/10 border border-success/20 rounded-lg p-4">
-                <h3 className="font-semibold text-success mb-2">What's Next?</h3>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li>• Check your email to verify the super admin account</li>
-                  <li>• Log in with your super admin credentials</li>
-                  <li>• Assign the institution to users</li>
-                  <li>• Create additional users with appropriate roles</li>
-                  <li>• Start capturing learner and student data</li>
-                </ul>
-              </div>
-              <Button
-                onClick={() => window.location.href = '/auth'}
-                className="w-full"
-              >
-                Go to Login
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Creating Institution...' : 'Create Institution & Continue'}
               </Button>
-            </CardContent>
-          </Card>
-        )}
+            </form>
+          )}
 
-        {/* Help Text */}
-        <Card className="bg-muted/50">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground text-center">
-              Need help? Contact your system administrator or refer to the setup documentation.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Step 2: Complete */}
+          {step === 2 && (
+            <div className="text-center space-y-4 py-8">
+              <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
+              <h3 className="text-2xl font-semibold">Setup Complete!</h3>
+              <p className="text-muted-foreground">
+                Your institution has been created successfully. You can now access the dashboard and start managing your data.
+              </p>
+              <Button onClick={() => navigate('/dashboard')} className="w-full mt-4">
+                Go to Dashboard
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

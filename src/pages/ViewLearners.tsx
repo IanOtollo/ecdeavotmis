@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Eye, Search, Filter, Download, Edit, UserCheck } from "lucide-react";
+import { Eye, Search, Filter, Download, Edit, UserCheck, Building2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,9 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 export default function ViewLearners() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,13 +22,19 @@ export default function ViewLearners() {
   const [loading, setLoading] = useState(true);
   const { profile } = useProfile();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (!profile?.institution_id) return;
-
     const fetchData = async () => {
       try {
         setLoading(true);
+
+        if (!profile?.institution_id) {
+          setLearners([]);
+          setStudents([]);
+          setLoading(false);
+          return;
+        }
 
         // Fetch ECDE learners
         const { data: learnersData, error: learnersError } = await supabase
@@ -94,7 +102,40 @@ export default function ViewLearners() {
   };
 
   if (loading) {
-    return <div className="p-6 text-center">Loading...</div>;
+    return (
+      <div className="p-6">
+        <div className="space-y-4">
+          <Skeleton className="h-12 w-64" />
+          <Skeleton className="h-32 w-full" />
+          <div className="grid grid-cols-4 gap-4">
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+          </div>
+          <Skeleton className="h-96 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile?.institution_id) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="p-12 text-center">
+            <Building2 className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2">No Institution Assigned</h3>
+            <p className="text-muted-foreground mb-4">
+              Your account is not linked to any institution. Please complete the setup process.
+            </p>
+            <Button onClick={() => navigate('/setup')}>
+              Complete Setup
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
