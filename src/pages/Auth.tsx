@@ -84,8 +84,11 @@ export default function Auth() {
 
       toast({
         title: 'Success',
-        description: 'Account created! Please check your email to verify your account.',
+        description: 'Account created! Redirecting to setup...',
       });
+      
+      // Wait a moment for the profile to be created, then navigate
+      setTimeout(() => navigate('/setup'), 1500);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast({

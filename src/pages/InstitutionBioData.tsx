@@ -198,7 +198,7 @@ export default function InstitutionBioData() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="institutionType">Institution Type *</Label>
-                <Select onValueChange={(value) => handleInputChange("institutionType", value)}>
+                <Select value={formData.institutionType} onValueChange={(value) => handleInputChange("institutionType", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select institution type" />
                   </SelectTrigger>
@@ -212,7 +212,7 @@ export default function InstitutionBioData() {
 
               <div className="space-y-2">
                 <Label htmlFor="institutionLevel">Institution Level *</Label>
-                <Select onValueChange={(value) => handleInputChange("institutionLevel", value)}>
+                <Select value={formData.institutionLevel} onValueChange={(value) => handleInputChange("institutionLevel", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select level" />
                   </SelectTrigger>
@@ -227,7 +227,7 @@ export default function InstitutionBioData() {
 
               <div className="space-y-2">
                 <Label htmlFor="educationSystem">Education System *</Label>
-                <Select onValueChange={(value) => handleInputChange("educationSystem", value)}>
+                <Select value={formData.educationSystem} onValueChange={(value) => handleInputChange("educationSystem", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select education system" />
                   </SelectTrigger>
@@ -242,7 +242,7 @@ export default function InstitutionBioData() {
 
               <div className="space-y-2">
                 <Label htmlFor="category">Category *</Label>
-                <Select onValueChange={(value) => handleInputChange("category", value)}>
+                <Select value={formData.category} onValueChange={(value) => handleInputChange("category", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
@@ -294,7 +294,7 @@ export default function InstitutionBioData() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="county">County *</Label>
-                <Select onValueChange={(value) => handleInputChange("county", value)}>
+                <Select value={formData.county} onValueChange={(value) => handleInputChange("county", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select county" />
                   </SelectTrigger>
@@ -397,7 +397,7 @@ export default function InstitutionBioData() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="ownership">Ownership Type *</Label>
-              <Select onValueChange={(value) => handleInputChange("ownership", value)}>
+              <Select value={formData.ownership} onValueChange={(value) => handleInputChange("ownership", value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select ownership type" />
                 </SelectTrigger>
