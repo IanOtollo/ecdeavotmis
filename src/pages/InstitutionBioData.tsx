@@ -16,6 +16,7 @@ export default function InstitutionBioData() {
   const { profile } = useProfile();
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [institutionName, setInstitutionName] = useState("");
   const [formData, setFormData] = useState({
     institutionType: "",
     institutionLevel: "",
@@ -50,6 +51,7 @@ export default function InstitutionBioData() {
         if (error) throw error;
 
         if (data) {
+          setInstitutionName(data.name || "");
           setFormData({
             institutionType: data.type || "",
             institutionLevel: data.level || "",
@@ -177,6 +179,9 @@ export default function InstitutionBioData() {
           <Building2 className="h-8 w-8 text-primary" />
           Institution Bio-data
         </h1>
+        {institutionName && (
+          <h2 className="text-xl font-semibold text-primary mt-2">{institutionName}</h2>
+        )}
         <p className="text-muted-foreground">
           Manage your institution's basic information and registration details
         </p>

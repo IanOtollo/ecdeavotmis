@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AlertTriangle, Save, Calendar, MapPin } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,11 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
+import { InstitutionSelector } from "@/components/InstitutionSelector";
 
 export default function EmergencyReporting() {
   const { toast } = useToast();
   const { profile } = useProfile();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedInstitutionId, setSelectedInstitutionId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     emergencyType: "",
     dateOccurred: "",
@@ -27,6 +29,12 @@ export default function EmergencyReporting() {
     status: "reported",
   });
 
+  useEffect(() => {
+    if (profile?.institution_id) {
+      setSelectedInstitutionId(profile.institution_id);
+    }
+  }, [profile]);
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -34,10 +42,10 @@ export default function EmergencyReporting() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!profile?.institution_id) {
+    if (!selectedInstitutionId) {
       toast({
         title: "Error",
-        description: "Institution not found",
+        description: "Please select an institution",
         variant: "destructive",
       });
       return;
@@ -48,7 +56,7 @@ export default function EmergencyReporting() {
       const { error } = await supabase
         .from('emergencies')
         .insert({
-          institution_id: profile.institution_id,
+          institution_id: selectedInstitutionId,
           calamity_name: formData.emergencyType,
           reporting_date: formData.dateOccurred,
           description: `${formData.description}\n\nLocation: ${formData.location}\nSeverity: ${formData.severity}\nInjuries: ${formData.injuries}\nDamage: ${formData.damageAssessment}\nResponse: ${formData.responseActions}`,
@@ -112,6 +120,11 @@ export default function EmergencyReporting() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <InstitutionSelector 
+              value={selectedInstitutionId}
+              onChange={setSelectedInstitutionId}
+              label="Institution"
+            />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="emergencyType">Emergency Type *</Label>

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
+import { InstitutionSelector } from "@/components/InstitutionSelector";
 
 export default function Infrastructure() {
   const { toast } = useToast();
@@ -16,6 +17,7 @@ export default function Infrastructure() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedInstitutionId, setSelectedInstitutionId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     assetName: "",
     assetType: "",
@@ -26,10 +28,16 @@ export default function Infrastructure() {
     condition: "",
   });
 
+  useEffect(() => {
+    if (profile?.institution_id) {
+      setSelectedInstitutionId(profile.institution_id);
+    }
+  }, [profile]);
+
   const [infrastructure, setInfrastructure] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!profile?.institution_id) return;
+    if (!selectedInstitutionId) return;
 
     const fetchInfrastructure = async () => {
       try {
@@ -37,7 +45,7 @@ export default function Infrastructure() {
         const { data, error } = await supabase
           .from('infrastructure')
           .select('*')
-          .eq('institution_id', profile.institution_id)
+          .eq('institution_id', selectedInstitutionId)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -55,15 +63,15 @@ export default function Infrastructure() {
     };
 
     fetchInfrastructure();
-  }, [profile?.institution_id, toast]);
+  }, [selectedInstitutionId, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!profile?.institution_id) {
+    if (!selectedInstitutionId) {
       toast({
         title: "Error",
-        description: "Institution not found",
+        description: "Please select an institution",
         variant: "destructive",
       });
       return;
@@ -74,7 +82,7 @@ export default function Infrastructure() {
       const { error } = await supabase
         .from('infrastructure')
         .insert({
-          institution_id: profile.institution_id,
+          institution_id: selectedInstitutionId,
           asset_name: formData.assetName,
           asset_type: formData.assetType,
           classification: formData.classification,
@@ -105,7 +113,7 @@ export default function Infrastructure() {
       const { data } = await supabase
         .from('infrastructure')
         .select('*')
-        .eq('institution_id', profile.institution_id)
+        .eq('institution_id', selectedInstitutionId)
         .order('created_at', { ascending: false });
       
       setInfrastructure(data || []);
@@ -163,6 +171,11 @@ export default function Infrastructure() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <InstitutionSelector 
+                value={selectedInstitutionId}
+                onChange={setSelectedInstitutionId}
+                label="Institution"
+              />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="assetName">Asset Name *</Label>
