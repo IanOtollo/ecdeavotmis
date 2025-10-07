@@ -10,12 +10,14 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
+import { InstitutionSelector } from "@/components/InstitutionSelector";
 
 export default function CapitationReceipts() {
   const { toast } = useToast();
   const { profile } = useProfile();
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedInstitutionId, setSelectedInstitutionId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     receiptNumber: "",
     amount: "",
@@ -29,7 +31,13 @@ export default function CapitationReceipts() {
   const [receipts, setReceipts] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!profile?.institution_id) return;
+    if (profile?.institution_id) {
+      setSelectedInstitutionId(profile.institution_id);
+    }
+  }, [profile?.institution_id]);
+
+  useEffect(() => {
+    if (!selectedInstitutionId) return;
 
     const fetchReceipts = async () => {
       try {
@@ -37,7 +45,7 @@ export default function CapitationReceipts() {
         const { data, error } = await supabase
           .from('capitation_receipts')
           .select('*')
-          .eq('institution_id', profile.institution_id)
+          .eq('institution_id', selectedInstitutionId)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -55,7 +63,7 @@ export default function CapitationReceipts() {
     };
 
     fetchReceipts();
-  }, [profile?.institution_id, toast]);
+  }, [selectedInstitutionId, toast]);
 
   const handleInputChange = (field: string, value: string | File | null) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -72,10 +80,10 @@ export default function CapitationReceipts() {
       return;
     }
 
-    if (!profile?.institution_id) {
+    if (!selectedInstitutionId) {
       toast({
         title: "Error",
-        description: "Institution not found",
+        description: "Please select an institution",
         variant: "destructive",
       });
       return;
@@ -86,7 +94,7 @@ export default function CapitationReceipts() {
 
       // Upload file to storage
       const fileExt = formData.receiptFile.name.split('.').pop();
-      const fileName = `${profile.institution_id}/${Date.now()}.${fileExt}`;
+      const fileName = `${selectedInstitutionId}/${Date.now()}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
         .from('receipts')
@@ -98,7 +106,7 @@ export default function CapitationReceipts() {
       const { error: insertError } = await supabase
         .from('capitation_receipts')
         .insert({
-          institution_id: profile.institution_id,
+          institution_id: selectedInstitutionId,
           receipt_no: formData.receiptNumber,
           amount: parseFloat(formData.amount),
           date_received: formData.receivedDate,
@@ -126,7 +134,7 @@ export default function CapitationReceipts() {
       const { data } = await supabase
         .from('capitation_receipts')
         .select('*')
-        .eq('institution_id', profile.institution_id)
+        .eq('institution_id', selectedInstitutionId)
         .order('created_at', { ascending: false });
       
       setReceipts(data || []);
@@ -164,6 +172,12 @@ export default function CapitationReceipts() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <InstitutionSelector
+              value={selectedInstitutionId}
+              onChange={setSelectedInstitutionId}
+              label="Select Institution"
+              required
+            />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="receiptNumber">Receipt Number</Label>

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
+import { InstitutionSelector } from "@/components/InstitutionSelector";
 
 export default function BankAccount() {
   const { toast } = useToast();
@@ -17,6 +18,7 @@ export default function BankAccount() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedInstitutionId, setSelectedInstitutionId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     bankName: "",
     accountNumber: "",
@@ -31,7 +33,13 @@ export default function BankAccount() {
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!profile?.institution_id) return;
+    if (profile?.institution_id) {
+      setSelectedInstitutionId(profile.institution_id);
+    }
+  }, [profile?.institution_id]);
+
+  useEffect(() => {
+    if (!selectedInstitutionId) return;
 
     const fetchBankAccounts = async () => {
       try {
@@ -39,7 +47,7 @@ export default function BankAccount() {
         const { data, error } = await supabase
           .from('bank_accounts')
           .select('*')
-          .eq('institution_id', profile.institution_id)
+          .eq('institution_id', selectedInstitutionId)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -57,7 +65,7 @@ export default function BankAccount() {
     };
 
     fetchBankAccounts();
-  }, [profile?.institution_id, toast]);
+  }, [selectedInstitutionId, toast]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -65,10 +73,10 @@ export default function BankAccount() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile?.institution_id) {
+    if (!selectedInstitutionId) {
       toast({
         title: "Error",
-        description: "Institution not found",
+        description: "Please select an institution",
         variant: "destructive",
       });
       return;
@@ -79,7 +87,7 @@ export default function BankAccount() {
       const { error } = await supabase
         .from('bank_accounts')
         .insert({
-          institution_id: profile.institution_id,
+          institution_id: selectedInstitutionId,
           bank_name: formData.bankName,
           account_number: formData.accountNumber,
           branch: formData.branchName,
@@ -108,7 +116,7 @@ export default function BankAccount() {
       const { data } = await supabase
         .from('bank_accounts')
         .select('*')
-        .eq('institution_id', profile.institution_id)
+        .eq('institution_id', selectedInstitutionId)
         .order('created_at', { ascending: false });
       
       setBankAccounts(data || []);
@@ -150,6 +158,12 @@ export default function BankAccount() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <InstitutionSelector
+                value={selectedInstitutionId}
+                onChange={setSelectedInstitutionId}
+                label="Select Institution"
+                required
+              />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="bankName">Bank Name</Label>
