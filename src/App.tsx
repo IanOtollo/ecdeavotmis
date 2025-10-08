@@ -7,6 +7,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Header } from "@/components/Header";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import Footer from "@/components/Footer";
 import Auth from "./pages/Auth";
 import InitialSetup from "./pages/InitialSetup";
 import Dashboard from "./pages/Dashboard";
@@ -73,6 +74,7 @@ const App = () => {
                           <Route path="*" element={<NotFound />} />
                         </Routes>
                       </main>
+                      <Footer />
                     </div>
                   </div>
                 </SidebarProvider>
