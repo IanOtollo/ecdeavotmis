@@ -113,7 +113,7 @@ export default function Auth() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <img 
-            src="/src/assets/busia-county-logo.png" 
+            src="/public/logo.png" 
             alt="Busia County" 
             className="h-20 mx-auto mb-4"
           />
