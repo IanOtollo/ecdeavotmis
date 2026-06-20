@@ -17,8 +17,7 @@ dist-ssr
 .env.local
 .env.*.local
 
-# Convex generated files
-convex/_generated/
+# convex/_generated/ is intentionally tracked so Vercel build can resolve imports
 
 # Editor directories and files
 .vscode/*
