@@ -84,23 +84,41 @@ export default function Auth() {
         </p>
       </div>
 
-      {/* Right — sign-in form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-background">
-        <div className="w-full max-w-sm space-y-8">
-          {/* Mobile brand */}
-          <div className="lg:hidden flex items-center gap-2">
-            <img src="/busia-county-logo.png" alt="Busia County" className="h-8 w-8 object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-            <span className="font-bold text-foreground">ECDEAVOTMIS</span>
+      {/* Right — sign-in area */}
+      <div
+        className="flex-1 flex flex-col items-center justify-center px-5 py-10 sm:px-8"
+        style={{ background: "hsl(220 20% 97%)" }}
+      >
+        {/* Mobile brand — centered logo + county name */}
+        <div className="lg:hidden flex flex-col items-center gap-2 mb-7">
+          <img
+            src="/busia-county-logo.png"
+            alt="Busia County"
+            className="h-16 w-16 object-contain"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+          <div className="text-center space-y-0.5">
+            <p className="text-[10px] tracking-[0.18em] uppercase text-foreground/35 font-light">Republic of Kenya</p>
+            <p className="text-xs font-semibold text-foreground/60">Busia County Government</p>
           </div>
+        </div>
 
+        {/* Sign-in card */}
+        <div
+          className="w-full max-w-sm rounded-2xl bg-white p-7 sm:p-8 space-y-6"
+          style={{
+            border: "1px solid hsl(220 16% 90%)",
+            boxShadow: "0 2px 8px hsl(220 15% 60% / 0.10), 0 10px 36px hsl(220 15% 60% / 0.08)",
+          }}
+        >
           <div>
-            <h2 className="text-2xl font-bold text-foreground tracking-tight">Sign in</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Enter your credentials to access the system</p>
+            <h2 className="text-xl font-bold text-foreground tracking-tight">Sign in</h2>
+            <p className="mt-1 text-sm text-muted-foreground">ECDEAVOTMIS — Enter your credentials</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground/70 uppercase tracking-wider">
+              <label className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">
                 Email Address
               </label>
               <input
@@ -109,14 +127,13 @@ export default function Auth() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@busia.go.ke"
-                className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground/40 transition-colors focus:outline-none focus:border-foreground/30 focus:ring-2 focus:ring-foreground/10"
-                style={{ boxShadow: "inset 0 1px 3px hsl(220 15% 70% / 0.08)" }}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground/40 transition-colors focus:outline-none focus:border-foreground/30 focus:ring-2 focus:ring-foreground/10"
                 disabled={loading}
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground/70 uppercase tracking-wider">
+              <label className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">
                 Password
               </label>
               <div className="relative">
@@ -126,8 +143,7 @@ export default function Auth() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full px-3.5 py-2.5 pr-10 rounded-lg border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground/40 transition-colors focus:outline-none focus:border-foreground/30 focus:ring-2 focus:ring-foreground/10"
-                  style={{ boxShadow: "inset 0 1px 3px hsl(220 15% 70% / 0.08)" }}
+                  className="w-full px-3.5 py-2.5 pr-10 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground/40 transition-colors focus:outline-none focus:border-foreground/30 focus:ring-2 focus:ring-foreground/10"
                   disabled={loading}
                 />
                 <button
@@ -156,15 +172,16 @@ export default function Auth() {
               {loading ? "Signing in…" : "Sign In"}
             </button>
 
-            <p className="text-center text-xs text-muted-foreground whitespace-nowrap">
-              Forgot your password? Contact your county chief of education to reset it.
+            <p className="text-center text-xs text-muted-foreground leading-relaxed">
+              Forgot your password?{" "}
+              <span className="whitespace-nowrap">Contact your county chief of education to reset it.</span>
             </p>
           </form>
-
-          <p className="text-center text-xs text-muted-foreground/40 pt-4 border-t border-border">
-            Authorised personnel only — Busia County Government property
-          </p>
         </div>
+
+        <p className="mt-6 text-center text-xs text-muted-foreground/40">
+          Authorised personnel only — Busia County Government property
+        </p>
       </div>
     </div>
   );

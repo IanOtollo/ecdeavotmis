@@ -102,7 +102,10 @@
   }
 
   html {
-    font-size: 17px;
+    font-size: 16px;
+  }
+  @media (min-width: 768px) {
+    html { font-size: 17px; }
   }
 
   body {
@@ -127,11 +130,16 @@
   }
 
   .section-heading {
-    @apply text-2xl font-bold text-foreground tracking-tight;
+    @apply text-xl sm:text-2xl font-bold text-foreground tracking-tight;
   }
 
   .page-container {
-    @apply p-6 md:p-8 max-w-7xl mx-auto;
+    @apply p-4 sm:p-6 md:p-8 max-w-7xl mx-auto;
+  }
+
+  /* Table row hover — used across all data tables */
+  .data-table-row {
+    @apply transition-colors hover:bg-muted/30;
   }
 
   /* Cards — raised, with depth */
