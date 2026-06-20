@@ -1,104 +1,110 @@
-ECDEAVOTMIS
+# ECDEAVOTMIS
 
-Education & Vocational Training Management Information System
+**Education & Vocational Training Management Information System — Busia County, Kenya**
 
-A web-based system for managing Early Childhood Development Education (ECDE) centers and Vocational Training institutions. The system allows institutions to register, manage learners/students, track infrastructure, emergency reports, financial records, and generate reports.
+A production government records system for registering ECDE centres and Vocational Training institutions, enrolling learners with unique identifiers (UPIs), tracking institutional assets, filing emergency reports, and generating county-wide reports — under full role-based access control.
 
-Features
-🔹 Institution Management
+---
 
-Register & manage institutions
+## Stack
 
-Capture bio-data (type, level, county, ward, education system, ownership, KRA pin, etc.)
+| Layer | Technology |
+|---|---|
+| Frontend | Vite + React 18 + TypeScript |
+| Backend / Database | [Convex](https://convex.dev) (reactive queries, mutations, file storage) |
+| Authentication | [Convex Auth](https://labs.convex.dev/auth) — Password provider only |
+| UI components | Tailwind CSS + shadcn/Radix |
+| Charts | Recharts |
+| Forms | react-hook-form + Zod |
 
-Upload supporting documents (certificates, ownership docs, compliance docs)
+---
 
-Manage infrastructure, bank accounts, capitation receipts, and school books
+## Setup
 
-🔹 Learners (ECDE & Vocational)
+### 1. Install dependencies
 
-Register learners/students with UPI auto-generation
-
-Capture personal info (first name, last name, other names, gender, DOB, photo)
-
-Record admission details
-
-View, search, update, and release learners
-
-Generate reports on admissions, learners per institution, and UPI lists
-
-🔹 Emergency Reporting
-
-Submit and track calamity reports per institution
-
-Capture incident type, date, description, response, and status
-
-🔹 Reports & Export
-
-Admission reports
-
-UPI lists
-
-Learner data export (CSV/Excel)
-
-Institution statistics
-
-🔹 Utilities
-
-Admin/User login & authentication
-
-Change password
-
-Logout
-
-Tech Stack
-
-Frontend: React + TypeScript + TailwindCSS + ShadCN UI
-
-Backend: Node.js / Express (API endpoints)
-
-Database: Supabase (PostgreSQL)
-
-Deployment: Vercel
-
-Getting Started
-Prerequisites
-
-Node.js (v18+) & npm
-
-Supabase account (for database)
-
-Vercel account (for deployment)
-
-Setup
-# Clone repository
-git clone <YOUR_GIT_URL>
-cd ecdeavotmis
-
-# Install dependencies
+```bash
 npm install
+```
 
-# Create an .env file and add your Supabase keys
-VITE_SUPABASE_URL=<your-supabase-url>
-VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+### 2. Configure environment
 
-# Start development server
+Create `.env.local` (never commit this):
+
+```env
+CONVEX_DEPLOYMENT=dev:your-project-name
+VITE_CONVEX_URL=https://your-project.convex.cloud
+```
+
+### 3. Deploy to Convex
+
+```bash
+CONVEX_DEPLOY_KEY=your-full-deploy-key npx convex deploy --cmd "echo done"
+```
+
+### 4. Seed the super admin (run once)
+
+```bash
+CONVEX_DEPLOY_KEY=your-full-deploy-key npx convex run seed:bootstrapSuperAdmin
+```
+
+This creates the county administrator account **idempotently** (safe to run twice). Credentials are printed to the console once:
+
+```
+Email:    admin@ecdeavotmis.go.ke
+Password: bsa@2026
+```
+
+**Rotate the password immediately after first login** via Profile → Change Password.
+
+### 5. Run the dev server
+
+```bash
 npm run dev
+```
 
+---
 
-The app will be available at http://localhost:5173 //or the available localhost set by your local PC environment 
-.
+## Role model
 
-Deployment
+| Role | Access |
+|---|---|
+| `super_admin` | Full county-wide access — all institutions, all learners, user management, audit log |
+| `institution_admin` | Full CRUD scoped to their assigned institution |
+| `teacher` | Capture and view learners at their institution |
+| `data_clerk` | Capture and view learners at their institution |
 
-Push your repo to GitHub
+There is **no public sign-up**. All users are created by the super admin via **Administration → Manage Users**.
 
-Link it with Vercel
+---
 
-Set the environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) in Vercel dashboard
+## UPI Format
 
-Deploy 
+Every learner receives a permanent Unique Personal Identifier on enrolment:
 
-Author
+```
+B-{INSTITUTION_CODE}-{SEQUENCE}
+Example: B-NEC001-00042
+```
 
-Developed by Ian Otollo.
+UPIs are generated server-side using a serializable Convex transaction — no `Math.random()`, no collisions.
+
+---
+
+## Key features
+
+- ECDE and Vocational Training learner enrolment with photo upload
+- Institution registration with auto-generated unique codes
+- Infrastructure, bank accounts, capitation receipts, school books tracking
+- Emergency incident reporting with status workflow
+- Learner transfer (UPI retained), release, and deceased recording
+- CSV export on all reports (live data, no mock rows)
+- County-wide KPI dashboard with charts
+- Full audit log
+- Role-based sidebar — each role sees only what they can use
+
+---
+
+## Database
+
+All data lives in Convex (no Supabase, no Postgres). The database ships **empty** — every institution and learner is created through the UI. The only pre-seeded record is the super admin account.

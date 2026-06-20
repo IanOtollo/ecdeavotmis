@@ -1,394 +1,152 @@
-import { useState, useEffect } from "react";
-import { FileBarChart, Search, Download, Filter, QrCode, Copy, Check } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { Download, FileBarChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useProfile } from "@/hooks/useProfile";
+import { toast } from "sonner";
+import { useState } from "react";
+import { Id } from "../../convex/_generated/dataModel";
+
+function exportCSV(data: any[], filename: string) {
+  if (!data.length) { toast.error("No data to export"); return; }
+  const headers = Object.keys(data[0]).join(",");
+  const rows = data.map((r) => Object.values(r).map((v) => JSON.stringify(v ?? "")).join(",")).join("\n");
+  const blob = new Blob([headers + "\n" + rows], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+  toast.success("UPI report exported");
+}
 
 export default function UPIReport() {
-  const { toast } = useToast();
-  const { profile } = useProfile();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [copiedUPI, setCopiedUPI] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [upiRecords, setUpiRecords] = useState<any[]>([]);
+  const { user } = useCurrentUser();
+  const isSuperAdmin = user?.role === "super_admin";
+  const institutionId = !isSuperAdmin ? user?.institutionId : undefined;
 
-  useEffect(() => {
-    if (!profile?.institution_id) return;
+  const institution = useQuery(
+    api.institutions.getById,
+    institutionId ? { institutionId: institutionId as Id<"institutions"> } : "skip"
+  );
+  const isVT = institution?.type === "Vocational Training";
 
-    const fetchUPIRecords = async () => {
-      try {
-        setLoading(true);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
-        const { data: ecdeLearners, error: ecdeError } = await supabase
-          .from('learners')
-          .select('*')
-          .eq('institution_id', profile.institution_id);
+  // Super admin can filter by program type; institution users see only their type
+  const [programFilter, setProgramFilter] = useState<"all" | "ecde" | "vocational">("all");
 
-        if (ecdeError) throw ecdeError;
+  const queryArgs: any = {};
+  if (institutionId) queryArgs.institutionId = institutionId;
+  if (!isSuperAdmin && institution) queryArgs.programType = isVT ? "vocational" : "ecde";
+  else if (isSuperAdmin && programFilter !== "all") queryArgs.programType = programFilter;
+  if (statusFilter !== "all") queryArgs.status = statusFilter;
 
-        const { data: vocationalStudents, error: vocationalError } = await supabase
-          .from('students')
-          .select('*')
-          .eq('institution_id', profile.institution_id);
+  const learners = useQuery(api.learners.list, queryArgs);
+  const institutions = useQuery(api.institutions.list);
 
-        if (vocationalError) throw vocationalError;
-
-        const records = [
-          ...(ecdeLearners || []).map(l => ({
-            id: l.id,
-            upi: l.upi,
-            firstName: l.first_name,
-            lastName: l.last_name,
-            otherName: l.other_name,
-            gender: l.gender,
-            dateOfBirth: l.dob,
-            admissionDate: l.admission_date || l.created_at,
-            type: 'ecde',
-            status: l.status,
-            photo: l.photo,
-            course: 'ECDE',
-            level: 'Early Childhood',
-            generatedDate: l.created_at
-          })),
-          ...(vocationalStudents || []).map(s => ({
-            id: s.id,
-            upi: s.upi,
-            firstName: s.first_name,
-            lastName: s.last_name,
-            otherName: s.other_name,
-            gender: s.gender,
-            dateOfBirth: s.dob,
-            admissionDate: s.admission_date || s.created_at,
-            type: 'vocational',
-            status: s.status,
-            photo: s.photo,
-            course: 'Vocational Training',
-            level: 'Technical',
-            generatedDate: s.created_at
-          }))
-        ];
-
-        setUpiRecords(records);
-      } catch (error: any) {
-        console.error('Error fetching UPI records:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load UPI records",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUPIRecords();
-  }, [profile?.institution_id, toast]);
-
-  const filteredRecords = upiRecords.filter(record => {
-    const matchesSearch = 
-      record.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.upi.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.course.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesType = filterType === "all" || record.type === filterType;
-    const matchesStatus = filterStatus === "all" || record.status?.toLowerCase() === filterStatus;
-    
-    return matchesSearch && matchesType && matchesStatus;
-  });
-
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-  };
-
-  const calculateAge = (dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    return age;
-  };
-
-  const copyUPI = async (upi: string) => {
-    try {
-      await navigator.clipboard.writeText(upi);
-      setCopiedUPI(upi);
-      toast({
-        title: "UPI Copied",
-        description: `UPI ${upi} copied to clipboard`,
-      });
-      setTimeout(() => setCopiedUPI(""), 2000);
-    } catch (err) {
-      toast({
-        title: "Copy Failed",
-        description: "Failed to copy UPI to clipboard",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const totalUPIs = upiRecords.length;
-  const activeUPIs = upiRecords.filter(r => r.status === "enrolled").length;
-  const ecdeUPIs = upiRecords.filter(r => r.type === "ecde").length;
-  const vocationalUPIs = upiRecords.filter(r => r.type === "vocational").length;
-
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center">
-        <p className="text-muted-foreground">Loading UPI records...</p>
-      </div>
-    );
+  function getInstitutionName(id: string) {
+    return institutions?.find((i) => i._id === id)?.name ?? "—";
   }
 
+  const rows = learners ?? [];
+
+  const exportData = rows.map((l) => ({
+    UPI: l.upi,
+    "First Name": l.firstName,
+    "Last Name": l.lastName,
+    "Other Name": l.otherName ?? "",
+    Gender: l.gender,
+    DOB: l.dob,
+    "Birth Cert No.": l.birthCertNo ?? "",
+    "National ID": l.nationalId ?? "",
+    Nationality: l.nationality ?? "",
+    Program: l.programType,
+    Class: l.classLevel ?? "",
+    "Admission Date": l.admissionDate,
+    Status: l.status,
+    Institution: isSuperAdmin ? getInstitutionName(l.institutionId) : institution?.name ?? "",
+  }));
+
+  const typeLabel = isSuperAdmin ? "All Programs" : isVT ? "Vocational Training" : "ECDE";
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="page-container space-y-6">
+      <div className="flex items-start justify-between pb-5 border-b border-border flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <FileBarChart className="h-8 w-8 text-primary" />
-            Student UPI Report
-          </h1>
-          <p className="text-muted-foreground">
-            Comprehensive report of all Unique Personal Identifiers (UPIs) issued by your institution
-          </p>
+          <h1 className="section-heading">UPI Register</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{typeLabel} · {rows.length} issued UPI(s)</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
-          <Button variant="outline">
-            <QrCode className="h-4 w-4 mr-2" />
-            Generate QR Codes
-          </Button>
-        </div>
+        <Button onClick={() => exportCSV(exportData, "upi-register.csv")} variant="outline" className="gap-1.5" disabled={!rows.length}>
+          <Download className="h-4 w-4" /> Export CSV
+        </Button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total UPIs Issued</p>
-                <p className="text-3xl font-bold text-primary">{totalUPIs}</p>
-              </div>
-              <FileBarChart className="h-12 w-12 text-primary opacity-20" />
-            </div>
-          </CardContent>
-        </Card>
+      {rows.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {[{label:"Total UPIs",value:rows.length},{label:"Male",value:rows.filter(l=>l.gender==="male").length},{label:"Female",value:rows.filter(l=>l.gender==="female").length}]
+            .map(({label,value})=><div key={label} className="rounded-xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">{label}</p><p className="text-xl font-bold mt-1">{value}</p></div>)}
+        </div>
+      )}
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Active UPIs</p>
-                <p className="text-3xl font-bold text-green-600">{activeUPIs}</p>
-                <p className="text-xs text-muted-foreground">
-                  {totalUPIs > 0 ? ((activeUPIs / totalUPIs) * 100).toFixed(1) : 0}% of total
-                </p>
-              </div>
-              <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
-                <Check className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">ECDE UPIs</p>
-                <p className="text-3xl font-bold text-blue-600">{ecdeUPIs}</p>
-                <p className="text-xs text-muted-foreground">Early Childhood</p>
-              </div>
-              <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-sm font-bold text-blue-600">ECDE</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Vocational UPIs</p>
-                <p className="text-3xl font-bold text-purple-600">{vocationalUPIs}</p>
-                <p className="text-xs text-muted-foreground">Technical Training</p>
-              </div>
-              <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">
-                <span className="text-sm font-bold text-purple-600">VOC</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="flex items-center gap-2">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, UPI, or course..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Program type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Programs</SelectItem>
-                <SelectItem value="ecde">ECDE</SelectItem>
-                <SelectItem value="vocational">Vocational</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger>
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="enrolled">Active</SelectItem>
-                <SelectItem value="transferred">Transferred</SelectItem>
-                <SelectItem value="graduated">Graduated</SelectItem>
-                <SelectItem value="suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline">
-              <Filter className="h-4 w-4 mr-2" />
-              Advanced Filters
-            </Button>
+      <div className="flex items-center gap-4 flex-wrap">
+        {isSuperAdmin && (
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Program</label>
+            <select value={programFilter} onChange={e=>setProgramFilter(e.target.value as any)} className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm">
+              <option value="all">All</option>
+              <option value="ecde">ECDE</option>
+              <option value="vocational">Vocational</option>
+            </select>
           </div>
-        </CardContent>
-      </Card>
+        )}
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</label>
+          <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value as any)} className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm">
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
 
-      {/* UPI Records Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>UPI Registry</CardTitle>
-          <CardDescription>
-            {filteredRecords.length} UPI record(s) found
-            {searchTerm && ` for "${searchTerm}"`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {filteredRecords.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student Information</TableHead>
-                  <TableHead>UPI Details</TableHead>
-                  <TableHead>Program Information</TableHead>
-                  <TableHead>Demographics</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRecords.map((record) => (
-                  <TableRow key={record.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarImage src={record.photo || ""} />
-                          <AvatarFallback>{getInitials(record.firstName, record.lastName)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">
-                            {record.firstName} {record.lastName}
-                            {record.otherName && ` ${record.otherName}`}
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-mono font-bold text-primary text-lg">{record.upi}</p>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copyUPI(record.upi)}
-                            className="h-6 w-6 p-0"
-                          >
-                            {copiedUPI === record.upi ? (
-                              <Check className="h-3 w-3 text-green-600" />
-                            ) : (
-                              <Copy className="h-3 w-3" />
-                            )}
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Admitted: {new Date(record.admissionDate).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{record.course}</p>
-                        <p className="text-sm text-muted-foreground">{record.level}</p>
-                        <Badge variant="outline" className="mt-1">
-                          {record.type === 'ecde' ? 'ECDE' : 'Vocational'}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="text-sm"><strong>Gender:</strong> {record.gender}</p>
-                        <p className="text-sm"><strong>Age:</strong> {calculateAge(record.dateOfBirth)} years</p>
-                        <p className="text-sm text-muted-foreground">
-                          DOB: {new Date(record.dateOfBirth).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={
-                        record.status === 'enrolled' ? 'default' :
-                        record.status === 'transferred' ? 'secondary' :
-                        record.status === 'graduated' ? 'outline' : 'destructive'
-                      }>
-                        {record.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          <QrCode className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-sm text-muted-foreground">No UPI records found</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {learners === undefined ? (
+        <div className="space-y-2">{[...Array(6)].map((_,i)=><div key={i} className="h-12 bg-muted rounded-xl animate-pulse"/>)}</div>
+      ) : rows.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <FileBarChart className="h-10 w-10 text-muted-foreground/30 mb-3"/>
+          <p className="text-muted-foreground text-sm">No UPIs issued yet</p>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border overflow-x-auto bg-card">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr>{(isSuperAdmin
+                  ? ["UPI","Name","Gender","DOB","Nationality","Program","Class","Admission Date","Status","Institution"]
+                  : ["UPI","Name","Gender","DOB","Birth Cert No.",isVT?"National ID":"","Nationality",isVT?"Course Year":"Class","Admission Date","Status"]
+                ).filter(Boolean).map(h=><th key={h} className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">{h}</th>)}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {rows.map(l=>(
+                <tr key={l._id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3"><span className="font-mono text-xs font-semibold bg-muted px-1.5 py-0.5 rounded">{l.upi}</span></td>
+                  <td className="px-4 py-3 font-medium whitespace-nowrap">{l.firstName} {l.lastName}{l.otherName?` ${l.otherName}`:""}</td>
+                  <td className="px-4 py-3 capitalize text-muted-foreground">{l.gender}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">{l.dob}</td>
+                  {!isSuperAdmin&&<td className="px-4 py-3 font-mono text-xs text-muted-foreground">{l.birthCertNo??"—"}</td>}
+                  {!isSuperAdmin&&isVT&&<td className="px-4 py-3 font-mono text-xs text-muted-foreground">{l.nationalId??"—"}</td>}
+                  <td className="px-4 py-3 text-muted-foreground text-xs">{l.nationality??"—"}</td>
+                  {isSuperAdmin&&<td className="px-4 py-3"><span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium uppercase">{l.programType}</span></td>}
+                  <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">{l.classLevel??"—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">{l.admissionDate}</td>
+                  <td className="px-4 py-3"><span className={`text-xs font-medium px-2 py-0.5 rounded-full ${l.status==="active"?"bg-green-50 text-green-700":"bg-muted text-muted-foreground"}`}>{l.status}</span></td>
+                  {isSuperAdmin&&<td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">{getInstitutionName(l.institutionId)}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

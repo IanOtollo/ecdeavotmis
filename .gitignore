@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Environment variables — NEVER commit
+.env
+.env.local
+.env.*.local
+
+# Convex generated files
+convex/_generated/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

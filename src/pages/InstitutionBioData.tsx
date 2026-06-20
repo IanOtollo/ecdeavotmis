@@ -1,454 +1,223 @@
-import { useState, useEffect } from "react";
-import { Building2, MapPin, FileText, Upload, Save } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useProfile } from "@/hooks/useProfile";
+import { toast } from "sonner";
+import { useEffect } from "react";
+import { Id } from "../../convex/_generated/dataModel";
+
+const S = "w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30";
+
+const SUBCOUNTIES = ["Busia","Teso North","Teso South","Nambale","Matayos","Butula","Samia"];
+const EDUCATION_SYSTEMS = ["CBC (Competency-Based Curriculum)","8-4-4","TVET","Islamic (Madrasa)","Other"];
+const LEVELS = ["Nursery / Pre-Primary","Lower Primary","Upper Primary","Secondary","Vocational / TVET","Other"];
+const OWNERSHIP_TYPES = ["Public","Private","Faith-based","NGO / CBO","Self-Help Group"];
+
+const schema = z.object({
+  name: z.string().min(3,"Min 3 chars"),
+  type: z.string().min(1,"Required"),
+  level: z.string().optional(),
+  educationSystem: z.string().optional(),
+  county: z.string().min(1,"Required"),
+  subcounty: z.string().min(1,"Required"),
+  ward: z.string().optional(),
+  zone: z.string().optional(),
+  location: z.string().optional(),
+  ownership: z.string().optional(),
+  kraPin: z.string().optional(),
+  registrationNo: z.string().optional(),
+  registrationDate: z.string().optional(),
+  sbpCompliance: z.boolean().optional(),
+  geoLat: z.coerce.number().optional(),
+  geoLng: z.coerce.number().optional(),
+  nearestTown: z.string().optional(),
+  nearestPolice: z.string().optional(),
+  nearestHealth: z.string().optional(),
+});
+type FormData = z.infer<typeof schema>;
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+      <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-3">{title}</h3>
+      {children}
+    </div>
+  );
+}
 
 export default function InstitutionBioData() {
-  const { toast } = useToast();
-  const { profile } = useProfile();
-  const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [institutionName, setInstitutionName] = useState("");
-  const [formData, setFormData] = useState({
-    institutionType: "",
-    institutionLevel: "",
-    county: "",
-    subCounty: "",
-    ward: "",
-    zone: "",
-    educationSystem: "",
-    kraPin: "",
-    registrationNumber: "",
-    category: "",
-    latitude: "",
-    longitude: "",
-    ownership: "",
-    sbpCompliance: false,
-    nearestHealthFacility: "",
-    nearestPoliceStation: "",
-    ownershipDocument: null as File | null,
+  const { user } = useCurrentUser();
+  const institutionId = user?.role !== "super_admin" ? user?.institutionId : undefined;
+
+  const institution = useQuery(
+    api.institutions.getById,
+    institutionId ? { institutionId: institutionId as Id<"institutions"> } : "skip"
+  );
+  const updateInstitution = useMutation(api.institutions.update);
+
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting, isDirty } } = useForm<FormData>({
+    resolver: zodResolver(schema),
   });
 
   useEffect(() => {
-    if (!profile?.institution_id) return;
-
-    const fetchInstitution = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('institutions')
-          .select('*')
-          .eq('id', profile.institution_id)
-          .single();
-
-        if (error) throw error;
-
-        if (data) {
-          setInstitutionName(data.name || "");
-          setFormData({
-            institutionType: data.type || "",
-            institutionLevel: data.level || "",
-            county: data.county || "",
-            subCounty: data.subcounty || "",
-            ward: data.ward || "",
-            zone: data.zone || "",
-            educationSystem: data.education_system || "",
-            kraPin: data.kra_pin || "",
-            registrationNumber: data.registration_no || "",
-            category: data.category || "",
-            latitude: data.geo_lat || "",
-            longitude: data.geo_lng || "",
-            ownership: data.ownership || "",
-            sbpCompliance: data.sbp_compliance || false,
-            nearestHealthFacility: data.nearest_health || "",
-            nearestPoliceStation: data.nearest_police || "",
-            ownershipDocument: null,
-          });
-        }
-      } catch (error: any) {
-        console.error('Error fetching institution:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchInstitution();
-  }, [profile?.institution_id]);
-
-  const handleInputChange = (field: string, value: string | boolean | File | null) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!profile?.institution_id) {
-      toast({
-        title: "Error",
-        description: "Institution not found",
-        variant: "destructive",
+    if (institution) {
+      reset({
+        name: institution.name,
+        type: institution.type,
+        level: institution.level ?? "",
+        educationSystem: institution.educationSystem ?? "",
+        county: institution.county,
+        subcounty: institution.subcounty,
+        ward: institution.ward ?? "",
+        zone: institution.zone ?? "",
+        location: institution.location ?? "",
+        ownership: institution.ownership ?? "",
+        kraPin: institution.kraPin ?? "",
+        registrationNo: institution.registrationNo ?? "",
+        registrationDate: institution.registrationDate ?? "",
+        sbpCompliance: institution.sbpCompliance ?? false,
+        geoLat: institution.geoLat ?? undefined,
+        geoLng: institution.geoLng ?? undefined,
+        nearestTown: institution.nearestTown ?? "",
+        nearestPolice: institution.nearestPolice ?? "",
+        nearestHealth: institution.nearestHealth ?? "",
       });
-      return;
     }
+  }, [institution, reset]);
 
+  async function onSubmit(data: FormData) {
+    if (!institution) return;
+    const payload: any = { institutionId: institution._id };
+    const readonlyFields = new Set(["county"]);
+    Object.entries(data).forEach(([k, v]) => { if (!readonlyFields.has(k) && v !== "" && v !== undefined) payload[k] = v; });
     try {
-      setIsSubmitting(true);
-
-      let ownershipDocPath = null;
-      if (formData.ownershipDocument) {
-        const fileExt = formData.ownershipDocument.name.split('.').pop();
-        const fileName = `${profile.institution_id}_ownership_${Date.now()}.${fileExt}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('receipts')
-          .upload(fileName, formData.ownershipDocument);
-
-        if (uploadError) throw uploadError;
-        ownershipDocPath = uploadData.path;
-      }
-
-      const { error } = await supabase
-        .from('institutions')
-        .update({
-          type: formData.institutionType,
-          level: formData.institutionLevel,
-          county: formData.county,
-          subcounty: formData.subCounty,
-          ward: formData.ward,
-          zone: formData.zone,
-          education_system: formData.educationSystem,
-          kra_pin: formData.kraPin,
-          registration_no: formData.registrationNumber,
-          category: formData.category,
-          geo_lat: formData.latitude,
-          geo_lng: formData.longitude,
-          ownership: formData.ownership,
-          sbp_compliance: formData.sbpCompliance,
-          nearest_health: formData.nearestHealthFacility,
-          nearest_police: formData.nearestPoliceStation,
-          ...(ownershipDocPath && { ownership_doc: ownershipDocPath }),
-        })
-        .eq('id', profile.institution_id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Institution Bio-data Updated",
-        description: "Your institution information has been successfully saved.",
-      });
-    } catch (error: any) {
-      console.error('Error updating institution:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save institution bio-data",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
+      await updateInstitution(payload);
+      toast.success("Institution bio-data updated");
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to update");
     }
-  };
+  }
 
-  if (loading) {
+  if (!institution) {
     return (
-      <div className="p-6 flex items-center justify-center">
-        <p className="text-muted-foreground">Loading institution data...</p>
+      <div className="page-container">
+        {institution === undefined ? (
+          <div className="h-8 w-48 bg-muted rounded animate-pulse" />
+        ) : (
+          <p className="text-muted-foreground text-sm">No institution assigned. Contact administrator.</p>
+        )}
       </div>
     );
   }
 
-  const counties = [
-    "Nairobi", "Mombasa", "Kisumu", "Nakuru", "Uasin Gishu", "Kiambu", "Machakos", "Kajiado"
-  ];
-
-  const institutionTypes = [
-    "Public Primary School", "Private Primary School", "Public Secondary School", 
-    "Private Secondary School", "ECDE Center", "Vocational Training Institute"
-  ];
-
   return (
-    <div className="p-6 space-y-6">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-          <Building2 className="h-8 w-8 text-primary" />
-          Institution Bio-data
-        </h1>
-        {institutionName && (
-          <h2 className="text-xl font-semibold text-primary mt-2">{institutionName}</h2>
-        )}
-        <p className="text-muted-foreground">
-          Manage your institution's basic information and registration details
-        </p>
+    <div className="page-container space-y-6">
+      <div className="pb-5 border-b border-border">
+        <h1 className="section-heading">Institution Bio-data</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{institution.name} · Update official institution information</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Basic Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              Basic Information
-            </CardTitle>
-            <CardDescription>
-              Provide essential details about your educational institution
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="institutionType">Institution Type *</Label>
-                <Select value={formData.institutionType} onValueChange={(value) => handleInputChange("institutionType", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select institution type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {institutionTypes.map((type) => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="institutionLevel">Institution Level *</Label>
-                <Select value={formData.institutionLevel} onValueChange={(value) => handleInputChange("institutionLevel", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="primary">Primary</SelectItem>
-                    <SelectItem value="secondary">Secondary</SelectItem>
-                    <SelectItem value="ecde">ECDE</SelectItem>
-                    <SelectItem value="vocational">Vocational</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="educationSystem">Education System *</Label>
-                <Select value={formData.educationSystem} onValueChange={(value) => handleInputChange("educationSystem", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select education system" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="8-4-4">8-4-4 System</SelectItem>
-                    <SelectItem value="cbc">Competency Based Curriculum (CBC)</SelectItem>
-                    <SelectItem value="igcse">IGCSE</SelectItem>
-                    <SelectItem value="ib">International Baccalaureate</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="category">Category *</Label>
-                <Select value={formData.category} onValueChange={(value) => handleInputChange("category", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="national">National School</SelectItem>
-                    <SelectItem value="extra-county">Extra County</SelectItem>
-                    <SelectItem value="county">County School</SelectItem>
-                    <SelectItem value="sub-county">Sub County School</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="kraPin">KRA PIN</Label>
-                <Input
-                  id="kraPin"
-                  placeholder="Enter KRA PIN"
-                  value={formData.kraPin}
-                  onChange={(e) => handleInputChange("kraPin", e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="registrationNumber">Registration Number *</Label>
-                <Input
-                  id="registrationNumber"
-                  placeholder="Enter registration number"
-                  value={formData.registrationNumber}
-                  onChange={(e) => handleInputChange("registrationNumber", e.target.value)}
-                  required
-                />
-              </div>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <Section title="Basic Information">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Institution Name *</label>
+              <Input {...register("name")} />{errors.name&&<p className="text-xs text-destructive">{errors.name.message}</p>}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Location Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-primary" />
-              Location Information
-            </CardTitle>
-            <CardDescription>
-              Specify the geographical location and administrative details
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="county">County *</Label>
-                <Select value={formData.county} onValueChange={(value) => handleInputChange("county", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select county" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {counties.map((county) => (
-                      <SelectItem key={county} value={county}>{county}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="subCounty">Sub County *</Label>
-                <Input
-                  id="subCounty"
-                  placeholder="Enter sub county"
-                  value={formData.subCounty}
-                  onChange={(e) => handleInputChange("subCounty", e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="ward">Ward *</Label>
-                <Input
-                  id="ward"
-                  placeholder="Enter ward"
-                  value={formData.ward}
-                  onChange={(e) => handleInputChange("ward", e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="zone">Zone</Label>
-                <Input
-                  id="zone"
-                  placeholder="Enter zone (optional)"
-                  value={formData.zone}
-                  onChange={(e) => handleInputChange("zone", e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="latitude">Latitude</Label>
-                <Input
-                  id="latitude"
-                  placeholder="e.g., -1.286389"
-                  value={formData.latitude}
-                  onChange={(e) => handleInputChange("latitude", e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="longitude">Longitude</Label>
-                <Input
-                  id="longitude"
-                  placeholder="e.g., 36.817223"
-                  value={formData.longitude}
-                  onChange={(e) => handleInputChange("longitude", e.target.value)}
-                />
-              </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type *</label>
+              <select {...register("type")} className={S}>
+                <option value="ECDE">ECDE</option>
+                <option value="Vocational Training">Vocational Training</option>
+              </select>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="nearestHealthFacility">Nearest Health Facility</Label>
-                <Input
-                  id="nearestHealthFacility"
-                  placeholder="Name of nearest health facility"
-                  value={formData.nearestHealthFacility}
-                  onChange={(e) => handleInputChange("nearestHealthFacility", e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="nearestPoliceStation">Nearest Police Station</Label>
-                <Input
-                  id="nearestPoliceStation"
-                  placeholder="Name of nearest police station"
-                  value={formData.nearestPoliceStation}
-                  onChange={(e) => handleInputChange("nearestPoliceStation", e.target.value)}
-                />
-              </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Level</label>
+              <select {...register("level")} className={S}><option value="">Select</option>{LEVELS.map(l=><option key={l}>{l}</option>)}</select>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Ownership & Compliance */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5 text-primary" />
-              Ownership & Compliance
-            </CardTitle>
-            <CardDescription>
-              Ownership details and regulatory compliance information
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="ownership">Ownership Type *</Label>
-              <Select value={formData.ownership} onValueChange={(value) => handleInputChange("ownership", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select ownership type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="public">Public</SelectItem>
-                  <SelectItem value="private">Private</SelectItem>
-                  <SelectItem value="faith-based">Faith-Based</SelectItem>
-                  <SelectItem value="ngo">NGO</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Education System / Curriculum</label>
+              <select {...register("educationSystem")} className={S}><option value="">Select</option>{EDUCATION_SYSTEMS.map(e=><option key={e}>{e}</option>)}</select>
             </div>
-
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="sbpCompliance"
-                checked={formData.sbpCompliance}
-                onCheckedChange={(checked) => handleInputChange("sbpCompliance", checked as boolean)}
-              />
-              <Label htmlFor="sbpCompliance">
-                SBP Compliance (School-Based Program compliance for private institutions)
-              </Label>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ownership</label>
+              <select {...register("ownership")} className={S}><option value="">Select</option>{OWNERSHIP_TYPES.map(o=><option key={o}>{o}</option>)}</select>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="ownershipDocument">Ownership Document</Label>
-              <div className="flex items-center space-x-2">
-                <Input
-                  id="ownershipDocument"
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  onChange={(e) => handleInputChange("ownershipDocument", e.target.files?.[0] || null)}
-                  className="file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary-hover"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Upload certificate of registration, title deed, or other ownership documents (PDF, DOC, DOCX)
-              </p>
+            <div className="flex items-center gap-3 col-span-2 pt-1">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" {...register("sbpCompliance")} className="h-4 w-4 rounded border-border" />
+                School Based Plan (SBP) Compliant
+              </label>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Section>
 
-        {/* Submit Button */}
+        <Section title="Location">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">County *</label>
+              <Input {...register("county")} readOnly className="bg-muted/30" />{errors.county&&<p className="text-xs text-destructive">{errors.county.message}</p>}
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sub-county *</label>
+              <select {...register("subcounty")} className={S}><option value="">Select</option>{SUBCOUNTIES.map(s=><option key={s}>{s}</option>)}</select>
+              {errors.subcounty&&<p className="text-xs text-destructive">{errors.subcounty.message}</p>}
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ward</label>
+              <Input {...register("ward")} placeholder="e.g. Nambale Ward" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Zone</label>
+              <Input {...register("zone")} placeholder="e.g. Nambale Zone A" />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Location / Physical Address</label>
+              <Input {...register("location")} placeholder="e.g. Along Busia-Malaba Road, off Nambale town" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">GPS Latitude</label>
+              <Input type="number" step="0.000001" {...register("geoLat")} placeholder="e.g. 0.4178" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">GPS Longitude</label>
+              <Input type="number" step="0.000001" {...register("geoLng")} placeholder="e.g. 34.2355" />
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Registration & Compliance">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Registration No.</label>
+              <Input {...register("registrationNo")} placeholder="e.g. ECDE/BSA/2015/001" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Registration Date</label>
+              <Input type="date" {...register("registrationDate")} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">KRA PIN</label>
+              <Input {...register("kraPin")} placeholder="e.g. P051000000A" className="font-mono" />
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Nearest Facilities">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nearest Town</label><Input {...register("nearestTown")} placeholder="e.g. Nambale"/></div>
+            <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nearest Police Station</label><Input {...register("nearestPolice")} placeholder="e.g. Nambale Police Post"/></div>
+            <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nearest Health Facility</label><Input {...register("nearestHealth")} placeholder="e.g. Nambale Sub-County Hospital"/></div>
+          </div>
+        </Section>
+
         <div className="flex justify-end">
-          <Button type="submit" className="bg-gradient-primary hover:opacity-90" disabled={isSubmitting}>
-            <Save className="h-4 w-4 mr-2" />
-            {isSubmitting ? "Saving..." : "Save Institution Bio-data"}
+          <Button type="submit" disabled={isSubmitting || !isDirty} style={{ backgroundColor: "#C8A96E", color: "#0A0A0A" }}>
+            {isSubmitting ? "Saving…" : "Save Changes"}
           </Button>
         </div>
       </form>

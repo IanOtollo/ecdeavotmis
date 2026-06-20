@@ -1,410 +1,194 @@
-import { useState, useEffect } from "react";
-import { BookOpen, Plus, Search, Edit, Trash2, Save } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useState } from "react";
+import { Plus, Pencil, Trash2, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useProfile } from "@/hooks/useProfile";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Id } from "../../convex/_generated/dataModel";
+
+const S = "w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30";
+const CATEGORIES = ["Textbook","Reference Book","Storybook / Library","Workbook / Activity","Teacher's Guide","Assessment / Exam Paper","Curriculum Material","Braille / Special Needs","Other"];
+const CONDITIONS  = ["New","Good","Fair","Poor","Condemned"];
+const FUNDING     = ["Government (National)","County Government","CDF","Parent / Community Contribution","Donation / NGO","Purchase (School Funds)","Other"];
+const CURRICULUM  = ["CBC (Competency-Based Curriculum)","KCPE / Kenya Curriculum","TVET / Vocational","Other"];
+const LANGUAGES   = ["English","Kiswahili","Bilingual (English & Kiswahili)","Local Language","Other"];
+const ECDE_GRADES = ["PP1","PP2","Grade 1","Grade 2","Grade 3","All Levels","Other"];
+const VT_GRADES   = ["Level 1","Level 2","Level 3","All Levels","Other"];
+
+const schema = z.object({
+  title: z.string().min(1,"Required"),
+  author: z.string().optional(), publisher: z.string().optional(), isbn: z.string().optional(),
+  subject: z.string().optional(), gradeLevel: z.string().optional(), language: z.string().optional(),
+  bookCategory: z.string().optional(), curriculumAlignment: z.string().optional(),
+  yearPublished: z.coerce.number().optional(),
+  quantity: z.coerce.number().min(0,"Required"),
+  inCirculation: z.coerce.number().optional(),
+  bookCondition: z.string().optional(), costPerUnit: z.coerce.number().optional(),
+  supplier: z.string().optional(), acquisitionDate: z.string().optional(),
+  fundingSource: z.string().optional(), storageLocation: z.string().optional(),
+});
+type FD = z.infer<typeof schema>;
+
+const COND_COLORS: Record<string,string> = {"New":"bg-green-100 text-green-700","Good":"bg-green-50 text-green-600","Fair":"bg-yellow-50 text-yellow-700","Poor":"bg-orange-50 text-orange-700","Condemned":"bg-red-100 text-red-700"};
+
+function BookForm({ defaults, isVT, onSubmit, onClose }: { defaults?:Partial<FD>; isVT?:boolean; onSubmit:(d:FD)=>Promise<void>; onClose:()=>void }) {
+  const { register, handleSubmit, formState:{errors,isSubmitting} } = useForm<FD>({ resolver:zodResolver(schema), defaultValues:{bookCondition:"Good",language:"English",...defaults} });
+  const gradeLevels = isVT ? VT_GRADES : ECDE_GRADES;
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[78vh] overflow-y-auto pr-1">
+      <div>
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Book Information</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Title *</label>
+            <Input {...register("title")} placeholder="e.g. Spotlight Science Grade 3"/>{errors.title&&<p className="text-xs text-destructive">{errors.title.message}</p>}</div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Author</label><Input {...register("author")} placeholder="e.g. Jane Muthoni"/></div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Publisher</label><Input {...register("publisher")} placeholder="e.g. Longhorn Publishers"/></div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">ISBN</label><Input {...register("isbn")} placeholder="e.g. 978-9966-XX-XXX-X"/></div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Year Published</label>
+            <Input type="number" min={1980} max={2030} {...register("yearPublished")} placeholder="e.g. 2023"/></div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Subject</label><Input {...register("subject")} placeholder="e.g. Mathematics, Science"/></div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Grade / Level</label>
+            <select {...register("gradeLevel")} className={S}><option value="">Select</option>{gradeLevels.map(g=><option key={g}>{g}</option>)}</select></div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Category</label>
+            <select {...register("bookCategory")} className={S}><option value="">Select</option>{CATEGORIES.map(c=><option key={c}>{c}</option>)}</select></div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Curriculum Alignment</label>
+            <select {...register("curriculumAlignment")} className={S}><option value="">Select</option>{CURRICULUM.map(c=><option key={c}>{c}</option>)}</select></div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Language</label>
+            <select {...register("language")} className={S}>{LANGUAGES.map(l=><option key={l}>{l}</option>)}</select></div>
+        </div>
+      </div>
+      <div>
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Inventory</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Quantity *</label>
+            <Input type="number" min={0} {...register("quantity")} placeholder="e.g. 60"/>{errors.quantity&&<p className="text-xs text-destructive">{errors.quantity.message}</p>}</div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">In Circulation</label>
+            <Input type="number" min={0} {...register("inCirculation")} placeholder="e.g. 55"/></div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Condition</label>
+            <select {...register("bookCondition")} className={S}>{CONDITIONS.map(c=><option key={c}>{c}</option>)}</select></div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cost per Unit (KES)</label>
+            <Input type="number" min={0} {...register("costPerUnit")} placeholder="e.g. 350"/></div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Acquisition Date</label><Input type="date" {...register("acquisitionDate")}/></div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Funding Source</label>
+            <select {...register("fundingSource")} className={S}><option value="">Select</option>{FUNDING.map(f=><option key={f}>{f}</option>)}</select></div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Supplier</label><Input {...register("supplier")} placeholder="e.g. Kenya Literature Bureau"/></div>
+          <div className="space-y-1"><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Storage Location</label><Input {...register("storageLocation")} placeholder="e.g. Library Shelf A3"/></div>
+        </div>
+      </div>
+      <div className="flex justify-end gap-2 pt-2 border-t border-border">
+        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+        <Button type="submit" disabled={isSubmitting}>{isSubmitting?"Saving…":"Save Book"}</Button>
+      </div>
+    </form>
+  );
+}
 
 export default function SchoolBooks() {
-  const { toast } = useToast();
-  const { profile } = useProfile();
-  const [showForm, setShowForm] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [books, setBooks] = useState<any[]>([]);
-  const [formData, setFormData] = useState({
-    title: "",
-    author: "",
-    isbn: "",
-    category: "",
-    level: "",
-    subject: "",
-    publisher: "",
-    yearPublished: "",
-    quantity: "",
-    unitPrice: "",
-    condition: "new"
-  });
+  const { user } = useCurrentUser();
+  const institutionId = user?.role !== "super_admin" ? user?.institutionId : undefined;
+  const institution = useQuery(api.institutions.getById, institutionId ? { institutionId } : "skip");
+  const isVT = institution?.type === "Vocational Training";
+  const books = useQuery(api.books.list, institutionId ? { institutionId } : {});
+  const createBook = useMutation(api.books.create);
+  const updateBook = useMutation(api.books.update);
+  const removeBook = useMutation(api.books.remove);
+  const [addOpen,setAddOpen] = useState(false);
+  const [editItem,setEditItem] = useState<any|null>(null);
+  const [deleteId,setDeleteId] = useState<Id<"books">|null>(null);
 
-  useEffect(() => {
-    if (!profile?.institution_id) return;
-
-    const fetchBooks = async () => {
-      try {
-        setLoading(true);
-
-        const { data, error } = await supabase
-          .from('books')
-          .select('*')
-          .eq('institution_id', profile.institution_id);
-
-        if (error) throw error;
-
-        setBooks(data || []);
-      } catch (error: any) {
-        console.error('Error fetching books:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load books",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchBooks();
-  }, [profile?.institution_id, toast]);
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!profile?.institution_id) {
-      toast({
-        title: "Error",
-        description: "Institution not found",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-
-      const { data, error } = await supabase
-        .from('books')
-        .insert({
-          institution_id: profile.institution_id,
-          title: formData.title,
-          author: formData.author,
-          isbn: formData.isbn,
-          category: formData.category,
-          level: formData.level,
-          subject: formData.subject,
-          publisher: formData.publisher,
-          year_published: formData.yearPublished ? parseInt(formData.yearPublished) : null,
-          quantity: formData.quantity ? parseInt(formData.quantity) : 0,
-          unit_price: formData.unitPrice,
-          condition: formData.condition
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      toast({
-        title: "Book Added Successfully",
-        description: `"${formData.title}" has been added to the school library inventory.`,
-      });
-
-      setBooks([...books, data]);
-      setShowForm(false);
-      setFormData({
-        title: "",
-        author: "",
-        isbn: "",
-        category: "",
-        level: "",
-        subject: "",
-        publisher: "",
-        yearPublished: "",
-        quantity: "",
-        unitPrice: "",
-        condition: "new"
-      });
-    } catch (error: any) {
-      console.error('Error adding book:', error);
-      toast({
-        title: "Error",
-        description: "Failed to add book",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const filteredBooks = books.filter(book =>
-    book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    book.author?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    book.subject?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center">
-        <p className="text-muted-foreground">Loading books...</p>
-      </div>
-    );
+  async function handleCreate(data:FD) {
+    if(!institutionId)return;
+    const p:any={...data,institutionId}; Object.keys(p).forEach(k=>{if(p[k]===""||p[k]===undefined)delete p[k];});
+    try{await createBook(p);toast.success("Book added");setAddOpen(false);}catch(e:any){toast.error(e.message??"Failed");}
+  }
+  async function handleUpdate(data:FD) {
+    if(!editItem)return;
+    const p:any={bookId:editItem._id,...data}; Object.keys(p).forEach(k=>{if(p[k]===""||p[k]===undefined)delete p[k];});
+    try{await updateBook(p);toast.success("Updated");setEditItem(null);}catch(e:any){toast.error(e.message??"Failed");}
+  }
+  async function handleDelete() {
+    if(!deleteId)return;
+    try{await removeBook({bookId:deleteId});toast.success("Removed");}catch(e:any){toast.error(e.message??"Failed");}
+    finally{setDeleteId(null);}
   }
 
+  const totalBooks=(books??[]).reduce((s,b)=>s+b.quantity,0);
+  const inCirc=(books??[]).reduce((s,b)=>s+(b.inCirculation??0),0);
+  const totalValue=(books??[]).reduce((s,b)=>s+(b.costPerUnit??0)*b.quantity,0);
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <BookOpen className="h-8 w-8 text-primary" />
-            School Books
-          </h1>
-          <p className="text-muted-foreground">
-            Manage your institution's book inventory and library resources
-          </p>
-        </div>
-        <Button onClick={() => setShowForm(!showForm)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add New Book
-        </Button>
+    <div className="page-container space-y-6">
+      <div className="flex items-start justify-between pb-5 border-b border-border">
+        <div><h1 className="section-heading">School Books</h1><p className="text-sm text-muted-foreground mt-0.5">Library and textbook inventory register</p></div>
+        {institutionId&&<Button onClick={()=>setAddOpen(true)} className="gap-1.5"><Plus className="h-4 w-4"/>Add Book</Button>}
       </div>
 
-      {/* Search Bar */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search books by title, author, or subject..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Add Book Form */}
-      {showForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Add New Book</CardTitle>
-            <CardDescription>Enter the details for the new book</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Book Title</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => handleInputChange("title", e.target.value)}
-                    placeholder="Enter book title"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="author">Author</Label>
-                  <Input
-                    id="author"
-                    value={formData.author}
-                    onChange={(e) => handleInputChange("author", e.target.value)}
-                    placeholder="Enter author name"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="isbn">ISBN</Label>
-                  <Input
-                    id="isbn"
-                    value={formData.isbn}
-                    onChange={(e) => handleInputChange("isbn", e.target.value)}
-                    placeholder="Enter ISBN number"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Select onValueChange={(value) => handleInputChange("category", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="textbook">Textbook</SelectItem>
-                      <SelectItem value="reference">Reference Book</SelectItem>
-                      <SelectItem value="manual">Technical Manual</SelectItem>
-                      <SelectItem value="workbook">Workbook</SelectItem>
-                      <SelectItem value="guide">Teacher's Guide</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="level">Level</Label>
-                  <Select onValueChange={(value) => handleInputChange("level", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ecde">ECDE</SelectItem>
-                      <SelectItem value="vocational">Vocational</SelectItem>
-                      <SelectItem value="general">General</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="subject">Subject</Label>
-                  <Input
-                    id="subject"
-                    value={formData.subject}
-                    onChange={(e) => handleInputChange("subject", e.target.value)}
-                    placeholder="Enter subject"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="publisher">Publisher</Label>
-                  <Input
-                    id="publisher"
-                    value={formData.publisher}
-                    onChange={(e) => handleInputChange("publisher", e.target.value)}
-                    placeholder="Enter publisher name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="yearPublished">Year Published</Label>
-                  <Input
-                    id="yearPublished"
-                    type="number"
-                    value={formData.yearPublished}
-                    onChange={(e) => handleInputChange("yearPublished", e.target.value)}
-                    placeholder="Enter year"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="quantity">Quantity</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    value={formData.quantity}
-                    onChange={(e) => handleInputChange("quantity", e.target.value)}
-                    placeholder="Enter quantity"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="unitPrice">Unit Price</Label>
-                  <Input
-                    id="unitPrice"
-                    value={formData.unitPrice}
-                    onChange={(e) => handleInputChange("unitPrice", e.target.value)}
-                    placeholder="e.g., KSH 500"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="condition">Condition</Label>
-                  <Select value={formData.condition} onValueChange={(value) => handleInputChange("condition", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select condition" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new">New</SelectItem>
-                      <SelectItem value="excellent">Excellent</SelectItem>
-                      <SelectItem value="good">Good</SelectItem>
-                      <SelectItem value="fair">Fair</SelectItem>
-                      <SelectItem value="poor">Poor</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  <Save className="h-4 w-4 mr-2" />
-                  {isSubmitting ? "Adding..." : "Add Book"}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+      {(books?.length??0)>0&&(
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[{label:"Titles",value:books?.length??0},{label:"Total Copies",value:totalBooks},{label:"In Circulation",value:inCirc},{label:"Est. Value",value:totalValue>0?`KES ${totalValue.toLocaleString()}`:"—"}]
+            .map(({label,value})=><div key={label} className="rounded-xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">{label}</p><p className="text-xl font-bold mt-1">{value}</p></div>)}
+        </div>
       )}
 
-      {/* Books Inventory */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Books Inventory</CardTitle>
-          <CardDescription>
-            {filteredBooks.length} book(s) found
-            {searchTerm && ` for "${searchTerm}"`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {filteredBooks.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Book Details</TableHead>
-                  <TableHead>Category & Level</TableHead>
-                  <TableHead>Publisher Info</TableHead>
-                  <TableHead>Inventory</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredBooks.map((book) => (
-                  <TableRow key={book.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{book.title}</p>
-                        <p className="text-sm text-muted-foreground">by {book.author}</p>
-                        {book.isbn && <p className="text-xs text-muted-foreground">ISBN: {book.isbn}</p>}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        {book.category && <Badge variant="outline">{book.category}</Badge>}
-                        <div className="text-sm">
-                          {book.level && <p><strong>Level:</strong> {book.level}</p>}
-                          {book.subject && <p><strong>Subject:</strong> {book.subject}</p>}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {book.publisher && <p><strong>Publisher:</strong> {book.publisher}</p>}
-                        {book.year_published && <p><strong>Year:</strong> {book.year_published}</p>}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">Qty: {book.quantity}</p>
-                        {book.unit_price && <p className="text-sm text-muted-foreground">{book.unit_price}</p>}
-                        {book.condition && (
-                          <Badge variant="secondary" className="mt-1">
-                            {book.condition}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-sm text-muted-foreground">No books found</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {books===undefined ? (
+        <div className="space-y-2">{[...Array(4)].map((_,i)=><div key={i} className="h-14 bg-muted rounded-xl animate-pulse"/>)}</div>
+      ) : books.length===0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <BookOpen className="h-10 w-10 text-muted-foreground/30 mb-3"/>
+          <p className="text-muted-foreground text-sm">No books in the inventory yet</p>
+          <Button variant="outline" onClick={()=>setAddOpen(true)} className="mt-3 gap-1.5"><Plus className="h-3.5 w-3.5"/>Add First Book</Button>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border overflow-x-auto bg-card">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50"><tr>{["Title","Author","Subject","Grade","Category","Qty","In Circ.","Condition","Cost/Unit",""].map(h=>(
+              <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">{h}</th>
+            ))}</tr></thead>
+            <tbody className="divide-y divide-border/60">
+              {books.map(b=>(
+                <tr key={b._id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3 font-medium max-w-[200px]"><p className="truncate">{b.title}</p>{b.isbn&&<p className="text-xs text-muted-foreground font-mono">{b.isbn}</p>}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">{b.author??"—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">{b.subject??"—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">{b.gradeLevel??"—"}</td>
+                  <td className="px-4 py-3 text-xs whitespace-nowrap">{b.bookCategory??"—"}</td>
+                  <td className="px-4 py-3 font-medium">{b.quantity}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{b.inCirculation??<span className="text-muted-foreground/40">—</span>}</td>
+                  <td className="px-4 py-3">
+                    {b.bookCondition&&<span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${COND_COLORS[b.bookCondition]??""}`}>{b.bookCondition}</span>}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">{b.costPerUnit?`KES ${b.costPerUnit.toLocaleString()}`:"—"}</td>
+                  <td className="px-4 py-3 text-right"><div className="flex justify-end gap-1">
+                    <button onClick={()=>setEditItem(b)} className="p-1.5 rounded-lg hover:bg-muted transition-colors"><Pencil className="h-3.5 w-3.5 text-muted-foreground"/></button>
+                    <button onClick={()=>setDeleteId(b._id)} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors"><Trash2 className="h-3.5 w-3.5 text-red-500"/></button>
+                  </div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Dialog open={addOpen} onOpenChange={o=>!o&&setAddOpen(false)}>
+        <DialogContent aria-describedby={undefined} className="max-w-xl"><DialogHeader><DialogTitle>Add Book to Inventory</DialogTitle></DialogHeader>
+          <BookForm isVT={isVT} onSubmit={handleCreate} onClose={()=>setAddOpen(false)}/></DialogContent>
+      </Dialog>
+      <Dialog open={!!editItem} onOpenChange={o=>!o&&setEditItem(null)}>
+        <DialogContent aria-describedby={undefined} className="max-w-xl"><DialogHeader><DialogTitle>Edit Book</DialogTitle></DialogHeader>
+          {editItem&&<BookForm isVT={isVT} defaults={editItem} onSubmit={handleUpdate} onClose={()=>setEditItem(null)}/>}</DialogContent>
+      </Dialog>
+      <AlertDialog open={!!deleteId} onOpenChange={o=>!o&&setDeleteId(null)}>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Remove book?</AlertDialogTitle><AlertDialogDescription>This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Remove</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
