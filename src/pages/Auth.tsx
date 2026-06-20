@@ -1,11 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useConvexAuth } from "convex/react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function Auth() {
   const { signIn } = useAuthActions();
+  const { isAuthenticated } = useConvexAuth();
   const navigate = useNavigate();
+
+  // Navigate only after Convex confirms auth is live
+  useEffect(() => {
+    if (isAuthenticated) navigate("/dashboard", { replace: true });
+  }, [isAuthenticated, navigate]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -22,7 +29,7 @@ export default function Auth() {
     setLoading(true);
     try {
       await signIn("password", { email, password, flow: "signIn" });
-      navigate("/dashboard");
+      // navigation handled by useEffect above once isAuthenticated flips true
     } catch (err: unknown) {
       const msg = (err as Error)?.message ?? "";
       if (msg.includes("Invalid") || msg.includes("credentials") || msg.includes("password")) {
