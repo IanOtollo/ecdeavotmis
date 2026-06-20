@@ -22,7 +22,7 @@ const CHART_COLORS = [
   "hsl(215 10% 80%)",
 ];
 
-/* ── KPI card — monochrome, depth through shadow ── */
+/* ── KPI card — stacks vertically on mobile, horizontal on sm+ ── */
 function KpiCard({
   label, value, sub, icon: Icon,
 }: {
@@ -33,16 +33,16 @@ function KpiCard({
 }) {
   return (
     <div
-      className="bg-card rounded-xl border border-border p-5 flex items-start gap-4"
+      className="bg-card rounded-xl border border-border p-4 sm:p-5 flex flex-col gap-3 min-w-0 overflow-hidden"
       style={{ boxShadow: "0 1px 3px hsl(220 15% 65% / 0.10), 0 4px 14px hsl(220 15% 65% / 0.07)" }}
     >
-      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-        <Icon className="h-5 w-5 text-muted-foreground" />
+      <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+        <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
       </div>
       <div className="min-w-0">
         <p className="text-2xl font-bold text-foreground tabular-nums leading-none">{value}</p>
-        <p className="text-xs font-semibold text-muted-foreground mt-1.5 uppercase tracking-wide">{label}</p>
-        {sub && <p className="text-xs text-muted-foreground/60 mt-0.5">{sub}</p>}
+        <p className="text-xs font-semibold text-muted-foreground mt-1.5 uppercase tracking-wide leading-tight">{label}</p>
+        {sub && <p className="text-xs text-muted-foreground/60 mt-1 break-words">{sub}</p>}
       </div>
     </div>
   );
@@ -317,7 +317,7 @@ function InstitutionDashboard({ kpis }: { kpis: NonNullable<ReturnType<typeof us
               style={{ boxShadow: "0 1px 3px hsl(220 15% 65% / 0.08), 0 2px 8px hsl(220 15% 65% / 0.05)" }}
             >
               <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                <Icon className="h-4.5 w-4.5 text-muted-foreground" />
+                <Icon className="h-4 w-4 text-muted-foreground" />
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground group-hover:text-foreground/80 transition-colors">{label}</p>
