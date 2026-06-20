@@ -4,7 +4,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useRef, useState } from "react";
 import {
   Building2, Users, BookOpen, AlertTriangle, Landmark, Database,
-  CheckCircle2, XCircle, Upload, Loader2, ImageIcon,
+  CheckCircle2, XCircle, Upload, ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -64,7 +64,7 @@ function LogoUploader({ institutionId, currentLogoUrl }: { institutionId: Id<"in
       {/* Logo preview */}
       <div className="h-24 w-24 rounded-2xl border-2 border-dashed border-border bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
         {uploading ? (
-          <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
+          <div className="h-full w-full animate-pulse bg-muted rounded-2xl" />
         ) : displaySrc ? (
           <img src={displaySrc} alt="School logo" className="h-full w-full object-contain p-1" />
         ) : (

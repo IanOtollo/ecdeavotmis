@@ -7,7 +7,6 @@ import { Header } from "@/components/Header";
 import Footer from "@/components/Footer";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Suspense, lazy } from "react";
-import { Loader2 } from "lucide-react";
 
 // Eager
 import Auth from "./pages/Auth";
@@ -42,8 +41,20 @@ const Profile = lazy(() => import("./pages/Profile"));
 
 function PageLoader() {
   return (
-    <div className="flex-1 flex items-center justify-center min-h-[300px]">
-      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 animate-pulse">
+      <div className="pb-5 border-b border-border space-y-2">
+        <div className="h-6 w-48 rounded-lg bg-muted" />
+        <div className="h-3.5 w-64 rounded bg-muted/60" />
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => <div key={i} className="rounded-xl bg-muted h-24" />)}
+      </div>
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="h-10 bg-muted/70" />
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="h-12 border-t border-border/60 bg-muted/20" />
+        ))}
+      </div>
     </div>
   );
 }
