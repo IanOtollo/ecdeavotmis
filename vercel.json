@@ -2,16 +2,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "routes": [
-    {
-      "src": "/assets/(.*)",
-      "headers": { "cache-control": "public, max-age=31536000, immutable" },
-      "continue": true
-    },
-    {
-      "src": "/(index\\.html|favicon\\.ico|robots\\.txt|.*\\.png|logo\\.png)",
-      "headers": { "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate" },
-      "continue": true
-    },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
